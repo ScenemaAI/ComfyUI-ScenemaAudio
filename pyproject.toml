@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "comfyui-scenema-audio"
+version = "0.1.0"
+description = "Expressive text-to-speech with zero-shot voice cloning via LTX 2.3 audio diffusion"
+license = { text = "MIT License" }
+requires-python = ">=3.10"
+authors = [{ name = "Scenema AI", email = "hello@scenema.ai" }]
+
+[project.urls]
+Repository = "https://github.com/ScenemaAI/ComfyUI-ScenemaAudio"
+
+[tool.comfy]
+PublisherId = "scenema"
+DisplayName = "Scenema Audio"

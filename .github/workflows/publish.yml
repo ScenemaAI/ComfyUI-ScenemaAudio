@@ -1,0 +1,17 @@
+name: Publish to ComfyUI Registry
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Publish Node
+        uses: Comfy-Org/publish-node-action@main
+        with:
+          registry_access_token: ${{ secrets.REGISTRY_ACCESS_TOKEN }}
