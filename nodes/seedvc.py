@@ -5,13 +5,8 @@
 """Scenema Audio voice conversion node for ComfyUI.
 
 Converts voice identity of generated speech to match a reference speaker
-while preserving prosody, rhythm, and emotion. Uses the Seed-VC model.
-
-Note: SeedVC requires its repository cloned locally with model checkpoints.
-The SEEDVC_PATH environment variable must point to the cloned repo.
-SeedVC's internal imports (app_vc, modules.bigvgan) are loaded dynamically
-because they require the repo on sys.path and cwd set to the repo root.
-This is a constraint of SeedVC's architecture, not a design choice.
+while preserving prosody, rhythm, and emotion. Uses vendored Seed-VC code
+with model weights auto-downloaded from HuggingFace.
 """
 
 import inspect
@@ -34,37 +29,39 @@ SEEDVC_SR = 22050
 DEFAULT_STEPS = 25
 DEFAULT_CFG_RATE = 0.5
 
+# Path to vendored SeedVC code
+_VENDOR_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "vendor", "seedvc")
 
-def _get_seedvc_path():
-    """Resolve the SeedVC repository path."""
-    seedvc_path = os.environ.get("SEEDVC_PATH", "")
-    if not seedvc_path or not os.path.isdir(seedvc_path):
-        raise ImportError(
-            "SeedVC not found. Set SEEDVC_PATH environment variable "
-            "to the path of the cloned seed-vc repository. "
-            "See: https://github.com/Plachtaa/seed-vc"
-        )
-    return seedvc_path
+# Singleton to avoid reloading models on every call
+_app_vc = None
+_seedvc_loaded = False
 
 
-def _load_seedvc(seedvc_path):
-    """Load SeedVC models to GPU.
-
-    SeedVC requires cwd set to its repo root and its modules on sys.path.
-    This is a constraint of SeedVC's internal imports, not our choice.
-    """
-    original_cwd = os.getcwd()
-    os.chdir(seedvc_path)
-
+def _ensure_seedvc_on_path():
+    """Add vendored SeedVC to sys.path."""
+    if _VENDOR_PATH not in sys.path:
+        sys.path.insert(0, _VENDOR_PATH)
     if "gradio" not in sys.modules:
         sys.modules["gradio"] = types.ModuleType("gradio")
 
-    if seedvc_path not in sys.path:
-        sys.path.insert(0, seedvc_path)
+
+def _load_seedvc():
+    """Load SeedVC models to GPU using vendored code."""
+    global _app_vc, _seedvc_loaded
+
+    if _seedvc_loaded:
+        return _app_vc
+
+    _ensure_seedvc_on_path()
+
+    # SeedVC downloads checkpoints relative to cwd
+    original_cwd = os.getcwd()
+    os.makedirs(os.path.join(_VENDOR_PATH, "checkpoints"), exist_ok=True)
+    os.chdir(_VENDOR_PATH)
 
     os.environ.setdefault(
         "HF_HUB_CACHE",
-        str(Path(seedvc_path) / "checkpoints" / "hf_cache"),
+        os.path.join(_VENDOR_PATH, "checkpoints", "hf_cache"),
     )
 
     # Patch BigVGAN for huggingface_hub compat
@@ -96,7 +93,28 @@ def _load_seedvc(seedvc_path):
     app_vc.overlap_wave_len = app_vc.overlap_frame_len * app_vc.hop_length
 
     os.chdir(original_cwd)
+
+    _app_vc = app_vc
+    _seedvc_loaded = True
+    logger.info("SeedVC loaded: sr=%d", app_vc.sr)
     return app_vc
+
+
+def _unload_seedvc():
+    """Free SeedVC models from GPU."""
+    global _app_vc, _seedvc_loaded
+
+    if not _seedvc_loaded:
+        return
+
+    for attr in ["model", "semantic_fn", "vocoder_fn", "campplus_model", "to_mel"]:
+        if hasattr(_app_vc, attr):
+            delattr(_app_vc, attr)
+
+    _app_vc = None
+    _seedvc_loaded = False
+    torch.cuda.empty_cache()
+    logger.info("SeedVC unloaded")
 
 
 def _run_conversion(app_vc, source_path, target_path, steps, cfg_rate):
@@ -133,14 +151,6 @@ def _run_conversion(app_vc, source_path, target_path, steps, cfg_rate):
     return samples, sample_rate
 
 
-def _cleanup_seedvc(app_vc):
-    """Free SeedVC models from GPU."""
-    for attr in ["model", "semantic_fn", "vocoder_fn", "campplus_model", "to_mel"]:
-        if hasattr(app_vc, attr):
-            delattr(app_vc, attr)
-    torch.cuda.empty_cache()
-
-
 def _audio_to_temp_wav(audio_data, target_sr):
     """Write ComfyUI AUDIO to a temp WAV file at target sample rate."""
     wav = audio_data["waveform"][0]
@@ -154,13 +164,39 @@ def _audio_to_temp_wav(audio_data, target_sr):
     return tmp.name
 
 
-class ScenemaAudioSeedVC:
+def convert_voice(source_audio, reference_audio, steps=DEFAULT_STEPS, cfg_rate=DEFAULT_CFG_RATE):
+    """Convert voice identity. Used by both the standalone node and Extended Generate.
+
+    Args:
+        source_audio: ComfyUI AUDIO dict (source speech)
+        reference_audio: ComfyUI AUDIO dict (target voice identity)
+        steps: SeedVC diffusion steps
+        cfg_rate: Classifier-free guidance rate
+
+    Returns:
+        ComfyUI AUDIO dict with converted voice
+    """
+    app_vc = _load_seedvc()
+
+    src_path = _audio_to_temp_wav(source_audio, SEEDVC_SR)
+    ref_path = _audio_to_temp_wav(reference_audio, SEEDVC_SR)
+
+    try:
+        samples, out_sr = _run_conversion(app_vc, src_path, ref_path, steps, cfg_rate)
+    finally:
+        os.unlink(src_path)
+        os.unlink(ref_path)
+
+    out_tensor = torch.from_numpy(samples).unsqueeze(0).unsqueeze(0)
+    return {"waveform": out_tensor, "sample_rate": out_sr}
+
+
+class ScenemaAudioVoiceClone:
     """Voice conversion using SeedVC.
 
     Converts the voice identity of source audio to match a reference
     speaker while preserving the source's delivery, emotion, and pacing.
-    Requires SEEDVC_PATH environment variable pointing to the cloned
-    seed-vc repository.
+    Model weights are auto-downloaded from HuggingFace on first use.
     """
 
     CATEGORY = "Scenema Audio"
@@ -187,20 +223,8 @@ class ScenemaAudioSeedVC:
 
     @torch.inference_mode()
     def convert(self, source, reference, steps=DEFAULT_STEPS, cfg_rate=DEFAULT_CFG_RATE):
-        seedvc_path = _get_seedvc_path()
-
-        src_path = _audio_to_temp_wav(source, SEEDVC_SR)
-        ref_path = _audio_to_temp_wav(reference, SEEDVC_SR)
-
-        try:
-            logger.info("Running voice conversion (%d steps, cfg_rate=%.2f)...", steps, cfg_rate)
-            app_vc = _load_seedvc(seedvc_path)
-            samples, out_sr = _run_conversion(app_vc, src_path, ref_path, steps, cfg_rate)
-            _cleanup_seedvc(app_vc)
-        finally:
-            os.unlink(src_path)
-            os.unlink(ref_path)
-
-        out_tensor = torch.from_numpy(samples).unsqueeze(0).unsqueeze(0)
-        logger.info("Voice conversion complete: %.1fs", len(samples) / out_sr)
-        return ({"waveform": out_tensor, "sample_rate": out_sr},)
+        logger.info("Running voice conversion (%d steps, cfg_rate=%.2f)...", steps, cfg_rate)
+        result = convert_voice(source, reference, steps, cfg_rate)
+        logger.info("Voice conversion complete: %.1fs",
+                     result["waveform"].shape[-1] / result["sample_rate"])
+        return (result,)

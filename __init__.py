@@ -17,7 +17,7 @@ try:
     from .nodes.decode import ScenemaAudioDecode
     from .nodes.vae_encode import ScenemaAudioVAEEncode
     from .nodes.vocal_separator import ScenemaAudioVocalSeparator
-    from .nodes.seedvc import ScenemaAudioSeedVC
+    from .nodes.seedvc import ScenemaAudioVoiceClone
     from .nodes.chunker import ScenemaAudioChunker, ScenemaAudioConcatenate
     from .nodes.extended_generate import ScenemaAudioExtendedGenerate
 
@@ -30,7 +30,7 @@ try:
         "ScenemaAudioDecode": ScenemaAudioDecode,
         "ScenemaAudioVAEEncode": ScenemaAudioVAEEncode,
         "ScenemaAudioVocalSeparator": ScenemaAudioVocalSeparator,
-        "ScenemaAudioSeedVC": ScenemaAudioSeedVC,
+        "ScenemaAudioVoiceClone": ScenemaAudioVoiceClone,
         "ScenemaAudioChunker": ScenemaAudioChunker,
         "ScenemaAudioConcatenate": ScenemaAudioConcatenate,
         "ScenemaAudioExtendedGenerate": ScenemaAudioExtendedGenerate,
@@ -45,7 +45,7 @@ try:
         "ScenemaAudioDecode": "Scenema Audio Decode",
         "ScenemaAudioVAEEncode": "Scenema Audio VAE Encode",
         "ScenemaAudioVocalSeparator": "Scenema Audio Vocal Separator",
-        "ScenemaAudioSeedVC": "Scenema Audio Voice Clone",
+        "ScenemaAudioVoiceClone": "Scenema Audio Voice Clone",
         "ScenemaAudioChunker": "Scenema Audio Chunker",
         "ScenemaAudioConcatenate": "Scenema Audio Concatenate",
         "ScenemaAudioExtendedGenerate": "Scenema Audio Extended Generate",
