@@ -10,8 +10,10 @@ for low-VRAM cards and bf16 for high-VRAM cards.
 
 import gc
 import logging
+import os
 
 import torch
+from huggingface_hub import snapshot_download
 from ltx_core.text_encoders.gemma.tokenizer import LTXVGemmaTokenizer
 from ltx_pipelines.distilled import DistilledPipeline
 from ltx_pipelines.utils.types import OffloadMode
@@ -22,6 +24,17 @@ from .utils import download_model, PIPELINE_CKPT
 logger = logging.getLogger(__name__)
 
 DEFAULT_GEMMA = "google/gemma-3-12b-it"
+
+
+def _resolve_gemma_path(gemma_path):
+    """Resolve Gemma path to a local directory.
+
+    If the path is a HuggingFace model ID (not a local dir), resolve it
+    to the local snapshot path via snapshot_download.
+    """
+    if os.path.isdir(gemma_path):
+        return gemma_path
+    return snapshot_download(gemma_path)
 
 
 def _encode_nf4(compiled_prompt, gemma_path, pipeline_path):
@@ -117,12 +130,13 @@ class ScenemaAudioTextEncode:
 
     def encode(self, compiled_prompt, model, gemma_path=DEFAULT_GEMMA, quantize="nf4"):
         logger.info("Encoding prompt with Gemma (%s)...", quantize)
+        gemma_local = _resolve_gemma_path(gemma_path)
         pipeline_path = download_model(PIPELINE_CKPT)
 
         if quantize == "nf4":
-            vc, ac = _encode_nf4(compiled_prompt, gemma_path, pipeline_path)
+            vc, ac = _encode_nf4(compiled_prompt, gemma_local, pipeline_path)
         else:
-            vc, ac = _encode_bf16(compiled_prompt, gemma_path, pipeline_path)
+            vc, ac = _encode_bf16(compiled_prompt, gemma_local, pipeline_path)
 
         logger.info("Text encoding complete")
         return ({"video_context": vc, "audio_context": ac},)

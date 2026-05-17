@@ -8,10 +8,12 @@ Loads the Audio VAE decoder (from pipeline checkpoint) and encoder
 (from standalone checkpoint) for audio latent encoding/decoding.
 """
 
+import json
 import logging
 
 import torch
-from ltx_pipelines.distilled import DistilledPipeline
+from ltx_pipelines.distilled import AudioDecoder
+from safetensors import safe_open
 
 from .utils import (
     PIPELINE_CKPT,
@@ -47,20 +49,21 @@ class ScenemaAudioVAELoader:
         pipeline_path = download_model(PIPELINE_CKPT)
         encoder_path = download_model(VAE_ENCODER_CKPT)
 
-        # Build pipeline for the audio decoder
-        pipeline = DistilledPipeline(
-            distilled_checkpoint_path=pipeline_path,
-            gemma_root=None,
-            spatial_upsampler_path=None,
-            loras=[],
+        # Load audio decoder directly (no Gemma dependency)
+        audio_decoder = AudioDecoder(
+            checkpoint_path=pipeline_path,
+            dtype=torch.bfloat16,
+            device=torch.device("cuda"),
         )
 
-        # Load VAE encoder separately
-        config_from_pipeline = pipeline.stage._config
-        encoder, vae_sr = load_vae_encoder(config_from_pipeline, encoder_path)
+        # Read config from pipeline checkpoint for VAE encoder
+        with safe_open(pipeline_path, framework="pt") as f:
+            config = json.loads(f.metadata()["config"])
+
+        encoder, vae_sr = load_vae_encoder(config, encoder_path)
 
         return ({
-            "pipeline": pipeline,
+            "decoder": audio_decoder,
             "encoder": encoder,
             "sample_rate": vae_sr,
         },)

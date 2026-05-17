@@ -39,10 +39,10 @@ class ScenemaAudioDecode:
 
     @torch.inference_mode()
     def decode(self, vae, latent):
-        pipeline = vae["pipeline"]
+        decoder = vae["decoder"]
 
         logger.info("Decoding audio latent %s...", latent.shape)
-        audio_obj = pipeline.audio_decoder(latent)
+        audio_obj = decoder(latent.cuda())
 
         # Extract waveform and format as ComfyUI AUDIO type
         waveform = audio_obj.waveform  # (B, C, samples) or (C, samples)
