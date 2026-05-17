@@ -16,3 +16,6 @@ Repository = "https://github.com/ScenemaAI/ComfyUI-ScenemaAudio"
 [tool.comfy]
 PublisherId = "scenema"
 DisplayName = "Scenema Audio"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

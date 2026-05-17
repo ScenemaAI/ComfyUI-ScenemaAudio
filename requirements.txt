@@ -3,3 +3,5 @@ bitsandbytes>=0.44.0
 torchaudio>=2.0.0
 soundfile>=0.12.0
 huggingface_hub>=0.20.0
+ltx-core @ git+https://github.com/Lightricks/LTX-2.git@41d924371612b692c0fd1e4d9d94c3dfb3c02cb3#subdirectory=packages/ltx-core
+ltx-pipelines @ git+https://github.com/Lightricks/LTX-2.git@41d924371612b692c0fd1e4d9d94c3dfb3c02cb3#subdirectory=packages/ltx-pipelines
