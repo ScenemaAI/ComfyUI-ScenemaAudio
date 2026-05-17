@@ -1,0 +1,230 @@
+{
+  "1": {
+    "inputs": {
+      "voice": "",
+      "gender": "male",
+      "speech_text": "",
+      "scene": "",
+      "action_tags": "",
+      "shot": "closeup",
+      "language": "en",
+      "xml_prompt": "<speak voice=\"Male, late 60s. Deep, gravelly. Slow and deliberate. The weight of the cosmos in every word.\" gender=\"male\" scene=\"Absolute silence\">\n  <action>He pauses, staring at something impossibly small</action>\n  Look again at that dot. That's here. That's home. That's us. On it, everyone you love, everyone you know, everyone you ever heard of, every human being who ever was, lived out their lives.\n  </speak>"
+    },
+    "class_type": "ScenemaAudioPromptCompiler",
+    "_meta": {
+      "title": "Scenema Audio Prompt Compiler"
+    }
+  },
+  "2": {
+    "inputs": {
+      "precision": "int8"
+    },
+    "class_type": "ScenemaAudioModelLoader",
+    "_meta": {
+      "title": "Scenema Audio Model Loader"
+    }
+  },
+  "3": {
+    "inputs": {},
+    "class_type": "ScenemaAudioVAELoader",
+    "_meta": {
+      "title": "Scenema Audio VAE Loader"
+    }
+  },
+  "8": {
+    "inputs": {
+      "audioUI": "",
+      "audio": [
+        "10",
+        0
+      ]
+    },
+    "class_type": "PreviewAudio",
+    "_meta": {
+      "title": "Preview Audio"
+    }
+  },
+  "10": {
+    "inputs": {
+      "audio": [
+        "14",
+        0
+      ]
+    },
+    "class_type": "ScenemaAudioVocalSeparator",
+    "_meta": {
+      "title": "Scenema Audio Vocal Separator"
+    }
+  },
+  "14": {
+    "inputs": {
+      "seed": 867474321250893,
+      "pace": 1.5,
+      "gemma_path": "google/gemma-3-12b-it",
+      "quantize": "nf4",
+      "validate": false,
+      "min_match_ratio": 0.9,
+      "skip_vc": false,
+      "vc_steps": 25,
+      "vc_cfg_rate": 1,
+      "model": [
+        "2",
+        0
+      ],
+      "vae": [
+        "3",
+        0
+      ],
+      "compiled_prompt": [
+        "1",
+        0
+      ],
+      "speech_text": [
+        "1",
+        1
+      ],
+      "ref_latent": [
+        "16",
+        0
+      ],
+      "xml_prompt": [
+        "1",
+        2
+      ]
+    },
+    "class_type": "ScenemaAudioExtendedGenerate",
+    "_meta": {
+      "title": "Scenema Audio Extended Generate"
+    }
+  },
+  "15": {
+    "inputs": {
+      "audio": "Niel deGras Tyson.mp3",
+      "audioUI": "/api/view?filename=Niel%20deGras%20Tyson.mp3&type=input&subfolder=&rand=0.15986825840340746"
+    },
+    "class_type": "LoadAudio",
+    "_meta": {
+      "title": "Load Audio"
+    }
+  },
+  "16": {
+    "inputs": {
+      "max_seconds": 10,
+      "vae": [
+        "3",
+        0
+      ],
+      "audio": [
+        "22",
+        0
+      ]
+    },
+    "class_type": "ScenemaAudioVAEEncode",
+    "_meta": {
+      "title": "Scenema Audio VAE Encode"
+    }
+  },
+  "17": {
+    "inputs": {
+      "precision": "int8"
+    },
+    "class_type": "ScenemaAudioModelLoader",
+    "_meta": {
+      "title": "Scenema Audio Model Loader"
+    }
+  },
+  "18": {
+    "inputs": {
+      "description": "Epic cinematic orchestral score, slow powerful build, deep cello and contrabass foundation, soaring violin melody, French horns swelling, timpani rolls, full orchestra crescendo",
+      "duration_s": 60,
+      "seed": 380146674029435,
+      "scene": "",
+      "gemma_path": "google/gemma-3-12b-it",
+      "quantize": "bf16",
+      "model": [
+        "17",
+        0
+      ],
+      "vae": [
+        "19",
+        0
+      ]
+    },
+    "class_type": "ScenemaAudioMusicGenerate",
+    "_meta": {
+      "title": "Scenema Audio Music Generate"
+    }
+  },
+  "19": {
+    "inputs": {},
+    "class_type": "ScenemaAudioVAELoader",
+    "_meta": {
+      "title": "Scenema Audio VAE Loader"
+    }
+  },
+  "20": {
+    "inputs": {
+      "audioUI": "",
+      "audio": [
+        "18",
+        0
+      ]
+    },
+    "class_type": "PreviewAudio",
+    "_meta": {
+      "title": "Preview Audio"
+    }
+  },
+  "21": {
+    "inputs": {
+      "precision": "int8"
+    },
+    "class_type": "ScenemaAudioModelLoader",
+    "_meta": {
+      "title": "Scenema Audio Model Loader"
+    }
+  },
+  "22": {
+    "inputs": {
+      "voice": "Female, mid 30s. Warm alto. Clear British accent. Confident and articulate.",
+      "gender": "female",
+      "seed": 820728406779544,
+      "preview_text": "The old lighthouse had stood on the cliff for over a century, its beam cutting through the fog like a blade of light.",
+      "scene": "",
+      "gemma_path": "google/gemma-3-12b-it",
+      "quantize": "nf4",
+      "model": [
+        "21",
+        0
+      ],
+      "vae": [
+        "23",
+        0
+      ]
+    },
+    "class_type": "ScenemaAudioVoiceDesign",
+    "_meta": {
+      "title": "Scenema Audio Voice Design"
+    }
+  },
+  "23": {
+    "inputs": {},
+    "class_type": "ScenemaAudioVAELoader",
+    "_meta": {
+      "title": "Scenema Audio VAE Loader"
+    }
+  },
+  "24": {
+    "inputs": {
+      "audioUI": "",
+      "audio": [
+        "22",
+        0
+      ]
+    },
+    "class_type": "PreviewAudio",
+    "_meta": {
+      "title": "Preview Audio"
+    }
+  }
+}
