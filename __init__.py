@@ -16,6 +16,10 @@ try:
     from .nodes.sampler import ScenemaAudioSampler
     from .nodes.decode import ScenemaAudioDecode
     from .nodes.vae_encode import ScenemaAudioVAEEncode
+    from .nodes.vocal_separator import ScenemaAudioVocalSeparator
+    from .nodes.seedvc import ScenemaAudioSeedVC
+    from .nodes.chunker import ScenemaAudioChunker, ScenemaAudioConcatenate
+    from .nodes.extended_generate import ScenemaAudioExtendedGenerate
 
     NODE_CLASS_MAPPINGS = {
         "ScenemaAudioPromptCompiler": ScenemaAudioPromptCompiler,
@@ -25,6 +29,11 @@ try:
         "ScenemaAudioSampler": ScenemaAudioSampler,
         "ScenemaAudioDecode": ScenemaAudioDecode,
         "ScenemaAudioVAEEncode": ScenemaAudioVAEEncode,
+        "ScenemaAudioVocalSeparator": ScenemaAudioVocalSeparator,
+        "ScenemaAudioSeedVC": ScenemaAudioSeedVC,
+        "ScenemaAudioChunker": ScenemaAudioChunker,
+        "ScenemaAudioConcatenate": ScenemaAudioConcatenate,
+        "ScenemaAudioExtendedGenerate": ScenemaAudioExtendedGenerate,
     }
 
     NODE_DISPLAY_NAME_MAPPINGS = {
@@ -35,10 +44,15 @@ try:
         "ScenemaAudioSampler": "Scenema Audio Sampler",
         "ScenemaAudioDecode": "Scenema Audio Decode",
         "ScenemaAudioVAEEncode": "Scenema Audio VAE Encode",
+        "ScenemaAudioVocalSeparator": "Scenema Audio Vocal Separator",
+        "ScenemaAudioSeedVC": "Scenema Audio Voice Clone",
+        "ScenemaAudioChunker": "Scenema Audio Chunker",
+        "ScenemaAudioConcatenate": "Scenema Audio Concatenate",
+        "ScenemaAudioExtendedGenerate": "Scenema Audio Extended Generate",
     }
 
     __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
 
 except ImportError:
-    # Running outside ComfyUI (e.g. pytest). Node registration not available.
+    # Running outside ComfyUI (e.g. pytest)
     pass

@@ -29,8 +29,8 @@ class ScenemaAudioPromptCompiler:
 
     CATEGORY = "Scenema Audio"
     FUNCTION = "compile"
-    RETURN_TYPES = ("STRING", "STRING")
-    RETURN_NAMES = ("compiled_prompt", "speech_text")
+    RETURN_TYPES = ("STRING", "STRING", "STRING")
+    RETURN_NAMES = ("compiled_prompt", "speech_text", "xml_prompt")
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -69,7 +69,7 @@ class ScenemaAudioPromptCompiler:
         # If raw XML is provided, use it directly
         if xml_prompt and xml_prompt.strip():
             result = compile_prompt(xml_prompt.strip())
-            return (result.prompt, result.speech_text)
+            return (result.prompt, result.speech_text, xml_prompt.strip())
 
         # Build XML from individual fields
         attrs = f'voice="{voice}" gender="{gender}"'
@@ -93,4 +93,4 @@ class ScenemaAudioPromptCompiler:
 
         xml = f"<speak {attrs}>\n{body}\n</speak>"
         result = compile_prompt(xml)
-        return (result.prompt, result.speech_text)
+        return (result.prompt, result.speech_text, xml)
