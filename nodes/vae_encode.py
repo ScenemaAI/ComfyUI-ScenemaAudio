@@ -43,7 +43,7 @@ class ScenemaAudioVAEEncode:
                 "max_seconds": ("FLOAT", {
                     "default": 5.0,
                     "min": 1.0,
-                    "max": 10.0,
+                    "max": 30.0,
                     "step": 0.5,
                 }),
             },
