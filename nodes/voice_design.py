@@ -72,7 +72,7 @@ class ScenemaAudioVoiceDesign:
                     "default": VOICE_DESIGN_TEXT,
                 }),
                 "scene": ("STRING", {"default": ""}),
-                "gemma_path": ("STRING", {"default": "google/gemma-3-12b-it"}),
+                "gemma_path": ("STRING", {"default": "unsloth/gemma-3-12b-it-bnb-4bit"}),
                 "quantize": (["nf4", "bf16"], {"default": "nf4"}),
             },
         }
@@ -80,7 +80,7 @@ class ScenemaAudioVoiceDesign:
     @torch.inference_mode()
     def design(self, model, vae, voice, gender, seed,
                preview_text=VOICE_DESIGN_TEXT, scene="",
-               gemma_path="google/gemma-3-12b-it", quantize="nf4"):
+               gemma_path="unsloth/gemma-3-12b-it-bnb-4bit", quantize="nf4"):
 
         # Build XML and compile
         attrs = f'voice="{voice}" gender="{gender}"'

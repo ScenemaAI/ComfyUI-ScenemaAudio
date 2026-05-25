@@ -5,8 +5,8 @@
 """Scenema Audio model loader node for ComfyUI.
 
 Loads the 3.3B audio-only transformer checkpoint with INT8 or bf16
-precision. Registers with ComfyUI model management for automatic
-VRAM offloading.
+precision. Keeps model on CPU until needed for sampling, allowing
+ComfyUI to manage VRAM across nodes.
 """
 
 import logging
@@ -29,6 +29,7 @@ class ScenemaAudioModelLoader:
 
     Downloads the checkpoint from HuggingFace on first use and caches it.
     Supports INT8 (4.9 GB) and bf16 (9.8 GB) precision.
+    Model stays on CPU until sampling to leave VRAM free for text encoding.
     """
 
     CATEGORY = "Scenema Audio"
@@ -51,8 +52,7 @@ class ScenemaAudioModelLoader:
 
         mdl_wrapper, config = load_transformer(path)
 
-        # Move to appropriate device via ComfyUI model management
+        # Keep on CPU — moved to GPU on demand during sampling
         device = comfy.model_management.get_torch_device()
-        mdl_wrapper = mdl_wrapper.to(device)
 
         return ({"model": mdl_wrapper, "config": config, "device": device},)

@@ -150,6 +150,7 @@ class ScenemaAudioSampler:
     def sample(self, model, conditioning, duration_s, seed, ref_latent=None):
         mdl_wrapper = model["model"]
         device = model["device"]
+        mdl_wrapper.to(device)
         vc = conditioning["video_context"]
         ac = conditioning["audio_context"]
 
@@ -189,6 +190,9 @@ class ScenemaAudioSampler:
 
         if torch.isnan(audio_state_out.latent).any():
             logger.warning("NaN detected in denoised latent")
+
+        mdl_wrapper.to("cpu")
+        torch.cuda.empty_cache()
 
         logger.info("Sampling complete")
         return (audio_state_out.latent,)

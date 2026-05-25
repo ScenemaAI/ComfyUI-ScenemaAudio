@@ -8,6 +8,16 @@ Expressive text-to-speech with zero-shot voice cloning via
 LTX 2.3 audio-only diffusion.
 """
 
+import os
+import sys
+
+# Add vendored packages to sys.path before any node imports.
+# ltx_core, ltx_pipelines, and seedvc are vendored to avoid
+# external git dependencies and ensure one-click install.
+_vendor_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vendor")
+if _vendor_path not in sys.path:
+    sys.path.insert(0, _vendor_path)
+
 try:
     from .nodes.prompt_compiler import ScenemaAudioPromptCompiler
     from .nodes.model_loader import ScenemaAudioModelLoader

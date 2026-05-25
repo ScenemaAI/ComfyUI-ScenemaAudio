@@ -50,6 +50,15 @@ RETRY_DURATION_FACTOR = 1.3
 MIN_WORD_MATCH_RATIO = 0.90
 
 
+def _log_vram(label):
+    """Log current and peak VRAM usage."""
+    allocated = torch.cuda.memory_allocated() / 1e9
+    peak = torch.cuda.max_memory_allocated() / 1e9
+    reserved = torch.cuda.memory_reserved() / 1e9
+    logger.info("VRAM [%s]: %.2fGB allocated, %.2fGB peak, %.2fGB reserved",
+                label, allocated, peak, reserved)
+
+
 def _encode_text(model_data, compiled_prompt, gemma_path, quantize):
     """Encode a single chunk's prompt via Gemma."""
     gemma_local = _resolve_gemma_path(gemma_path)
@@ -62,9 +71,17 @@ def _encode_text(model_data, compiled_prompt, gemma_path, quantize):
 
 
 def _sample_chunk(model_data, vc, ac, duration_s, seed, ref_latent=None):
-    """Run diffusion sampling for a single chunk."""
+    """Run diffusion sampling for a single chunk.
+
+    Moves the transformer to GPU before sampling and back to CPU after,
+    freeing VRAM for other models (Gemma, VAE, etc.).
+    """
     mdl_wrapper = model_data["model"]
     device = model_data["device"]
+
+    # Move transformer to GPU for sampling
+    mdl_wrapper.to(device)
+    _log_vram("transformer on GPU")
 
     pixel_shape = _build_pixel_shape(duration_s)
     gen = torch.Generator(device=device).manual_seed(seed)
@@ -97,6 +114,12 @@ def _sample_chunk(model_data, vc, ac, duration_s, seed, ref_latent=None):
 
     audio_state_out = audio_tools.clear_conditioning(audio_state_out)
     audio_state_out = audio_tools.unpatchify(audio_state_out)
+
+    # Move transformer back to CPU to free VRAM
+    _log_vram("after diffusion")
+    mdl_wrapper.to("cpu")
+    torch.cuda.empty_cache()
+    _log_vram("transformer offloaded")
 
     return audio_state_out.latent
 
@@ -226,7 +249,7 @@ class ScenemaAudioExtendedGenerate:
                 "pace": ("FLOAT", {
                     "default": 1.5, "min": 0.5, "max": 3.0, "step": 0.1,
                 }),
-                "gemma_path": ("STRING", {"default": "google/gemma-3-12b-it"}),
+                "gemma_path": ("STRING", {"default": "unsloth/gemma-3-12b-it-bnb-4bit"}),
                 "quantize": (["nf4", "bf16"], {"default": "nf4"}),
                 "ref_latent": ("SA_LATENT",),
                 "xml_prompt": ("STRING", {"forceInput": True, "default": ""}),
@@ -246,12 +269,14 @@ class ScenemaAudioExtendedGenerate:
 
     @torch.inference_mode()
     def generate(self, model, vae, compiled_prompt, speech_text, seed,
-                 pace=1.5, gemma_path="google/gemma-3-12b-it", quantize="nf4",
+                 pace=1.5, gemma_path="unsloth/gemma-3-12b-it-bnb-4bit", quantize="nf4",
                  ref_latent=None, xml_prompt="", validate=False, min_match_ratio=0.90,
                  skip_vc=False, vc_steps=25, vc_cfg_rate=0.5):
 
         chunks = self._plan(xml_prompt, compiled_prompt, speech_text, seed, pace)
 
+        torch.cuda.reset_peak_memory_stats()
+        _log_vram("start")
         logger.info("Generating %d chunk(s) (validate=%s, skip_vc=%s)...",
                      len(chunks), validate, skip_vc)
 
@@ -270,6 +295,7 @@ class ScenemaAudioExtendedGenerate:
                 model, vae, chunk, gemma_path, quantize,
                 current_ref, validate, min_match_ratio,
             )
+            _log_vram(f"after chunk {i+1}")
             waveforms.append(waveform)
 
             if i < len(chunks) - 1:

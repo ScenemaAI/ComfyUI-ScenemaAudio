@@ -51,6 +51,7 @@ def _sample(model_data, vc, ac, duration_s, seed, ref_latent=None):
     """Run diffusion sampling for a single chunk."""
     mdl_wrapper = model_data["model"]
     device = model_data["device"]
+    mdl_wrapper.to(device)
 
     pixel_shape = _build_pixel_shape(duration_s)
     gen = torch.Generator(device=device).manual_seed(seed)
@@ -83,6 +84,9 @@ def _sample(model_data, vc, ac, duration_s, seed, ref_latent=None):
 
     audio_state_out = audio_tools.clear_conditioning(audio_state_out)
     audio_state_out = audio_tools.unpatchify(audio_state_out)
+
+    mdl_wrapper.to("cpu")
+    torch.cuda.empty_cache()
 
     return audio_state_out.latent
 
@@ -158,14 +162,14 @@ class ScenemaAudioMusicGenerate:
                     "multiline": False,
                     "default": "",
                 }),
-                "gemma_path": ("STRING", {"default": "google/gemma-3-12b-it"}),
+                "gemma_path": ("STRING", {"default": "unsloth/gemma-3-12b-it-bnb-4bit"}),
                 "quantize": (["nf4", "bf16"], {"default": "nf4"}),
             },
         }
 
     @torch.inference_mode()
     def generate(self, model, vae, description, duration_s, seed,
-                 scene="", gemma_path="google/gemma-3-12b-it", quantize="nf4"):
+                 scene="", gemma_path="unsloth/gemma-3-12b-it-bnb-4bit", quantize="nf4"):
 
         prompt = _compile_music_prompt(description, scene)
         num_chunks = max(1, math.ceil(duration_s / MAX_CHUNK_DURATION))
