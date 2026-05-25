@@ -1,0 +1,71 @@
+{
+  "1": {
+    "inputs": {
+      "precision": "int8"
+    },
+    "class_type": "ScenemaAudioModelLoader",
+    "_meta": {
+      "title": "Scenema Audio Model Loader"
+    }
+  },
+  "2": {
+    "inputs": {},
+    "class_type": "ScenemaAudioVAELoader",
+    "_meta": {
+      "title": "Scenema Audio VAE Loader"
+    }
+  },
+  "3": {
+    "inputs": {
+      "voice": "Female, mid 30s. Warm alto. Clear British accent. Confident and articulate.",
+      "gender": "female",
+      "seed": 0,
+      "preview_text": "The old lighthouse had stood on the cliff for over a century, its beam cutting through the fog like a blade of light.",
+      "scene": "",
+      "gemma_path": "unsloth/gemma-3-12b-it-bnb-4bit",
+      "quantize": "nf4",
+      "model": [
+        "1",
+        0
+      ],
+      "vae": [
+        "2",
+        0
+      ]
+    },
+    "class_type": "ScenemaAudioVoiceDesign",
+    "_meta": {
+      "title": "Scenema Audio Voice Design"
+    }
+  },
+  "4": {
+    "inputs": {
+      "audioUI": "",
+      "audio": [
+        "3",
+        0
+      ]
+    },
+    "class_type": "PreviewAudio",
+    "_meta": {
+      "title": "Preview Audio"
+    }
+  },
+  "5": {
+    "inputs": {
+      "max_seconds": 10,
+      "vae": [
+        "2",
+        0
+      ],
+      "audio": [
+        "3",
+        0
+      ]
+    },
+    "class_type": "ScenemaAudioVAEEncode",
+    "_meta": {
+      "title": "Scenema Audio VAE Encode"
+    }
+  }
+}
