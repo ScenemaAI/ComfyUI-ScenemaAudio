@@ -4,8 +4,11 @@
 
 """Scenema Audio text encoding node for ComfyUI.
 
-Encodes compiled text prompts via Gemma 3 12B. Supports NF4 quantization
-for low-VRAM cards and bf16 for high-VRAM cards.
+Encodes compiled text prompts via Gemma 3 12B. Supports multiple
+quantization strategies for different VRAM sizes:
+- nf4: Pre-quantized NF4 on GPU (~8GB, needs 12GB+ card)
+- cpu: bf16 with CPU/GPU split via device_map (works on 8GB+)
+- bf16: Full precision, all on GPU (needs 40GB+)
 """
 
 import gc
@@ -24,7 +27,8 @@ from .utils import download_model, PIPELINE_CKPT
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_GEMMA = "unsloth/gemma-3-12b-it-bnb-4bit"
+DEFAULT_GEMMA_NF4 = "unsloth/gemma-3-12b-it-bnb-4bit"
+DEFAULT_GEMMA_BF16 = "google/gemma-3-12b-it"
 
 
 def _resolve_gemma_path(gemma_path):
@@ -32,11 +36,6 @@ def _resolve_gemma_path(gemma_path):
     if os.path.isdir(gemma_path):
         return gemma_path
     return snapshot_download(gemma_path)
-
-
-def _is_pre_quantized(gemma_path):
-    """Check if the Gemma model is already pre-quantized."""
-    return "bnb-4bit" in gemma_path or "bnb_4bit" in gemma_path
 
 
 def _free_vram():
@@ -48,15 +47,16 @@ def _free_vram():
 
 
 def _build_embeddings_processor(gemma_path, pipeline_path):
-    """Build the embeddings processor and tokenizer on CPU.
+    """Build the embeddings processor and tokenizer on CPU."""
+    # DistilledPipeline needs a gemma_root with tokenizer.model.
+    # Pre-quantized repos may not have it, resolve to full gemma for tokenizer.
+    tokenizer_path = gemma_path
+    if not os.path.exists(os.path.join(gemma_path, "tokenizer.model")):
+        tokenizer_path = _resolve_gemma_path(DEFAULT_GEMMA_BF16)
 
-    Extracts just the text projection weights from the pipeline checkpoint
-    without loading the full model to GPU. Returns the processor and
-    tokenizer, then frees the pipeline.
-    """
     pipeline = DistilledPipeline(
         distilled_checkpoint_path=pipeline_path,
-        gemma_root=gemma_path,
+        gemma_root=tokenizer_path,
         spatial_upsampler_path=None,
         loras=[],
         offload_mode=OffloadMode.CPU,
@@ -65,7 +65,7 @@ def _build_embeddings_processor(gemma_path, pipeline_path):
     emb_proc = pe._embeddings_processor_builder.build(
         device="cpu", dtype=torch.bfloat16
     ).eval()
-    tokenizer = LTXVGemmaTokenizer(gemma_path)
+    tokenizer = LTXVGemmaTokenizer(tokenizer_path)
 
     del pipeline, pe
     gc.collect()
@@ -73,34 +73,18 @@ def _build_embeddings_processor(gemma_path, pipeline_path):
     return emb_proc, tokenizer
 
 
-def _encode_nf4(compiled_prompt, gemma_path, pipeline_path):
-    """Encode prompt using NF4-quantized Gemma (~8 GB VRAM).
+def _encode_gemma(compiled_prompt, gemma_path, pipeline_path, load_kwargs):
+    """Core encoding: load Gemma, encode, run embeddings processor on CPU.
 
-    Loads the embeddings processor on CPU first, then loads Gemma to GPU,
-    runs inference, and frees everything. This ensures the pipeline
-    checkpoint and Gemma are never on GPU simultaneously.
+    This is the shared implementation for all quantization modes.
+    The only difference is how Gemma is loaded (load_kwargs).
     """
     _free_vram()
 
-    # Step 1: Build embeddings processor on CPU (no GPU needed)
+    # Step 1: Build embeddings processor on CPU
     emb_proc, tokenizer = _build_embeddings_processor(gemma_path, pipeline_path)
 
-    # Step 2: Load Gemma to GPU with memory limit
-    vram_gb = torch.cuda.get_device_properties(0).total_memory / 1e9
-    max_gpu_mem = f"{int(vram_gb - 2)}GiB"
-
-    load_kwargs = {
-        "device_map": "auto",
-        "max_memory": {0: max_gpu_mem, "cpu": "32GiB"},
-        "dtype": torch.bfloat16,
-    }
-    if not _is_pre_quantized(gemma_path):
-        load_kwargs["quantization_config"] = BitsAndBytesConfig(
-            load_in_4bit=True,
-            bnb_4bit_compute_dtype=torch.bfloat16,
-            bnb_4bit_quant_type="nf4",
-        )
-
+    # Step 2: Load Gemma
     gemma_model = Gemma3ForConditionalGeneration.from_pretrained(
         gemma_path, **load_kwargs
     ).eval()
@@ -109,7 +93,7 @@ def _encode_nf4(compiled_prompt, gemma_path, pipeline_path):
     _peak = torch.cuda.max_memory_allocated() / 1e9
     logger.info("VRAM after Gemma load: %.2fGB (peak %.2fGB)", _vram, _peak)
 
-    # Step 3: Encode — run Gemma on GPU, embeddings processor on CPU
+    # Step 3: Encode text via Gemma
     with torch.inference_mode():
         tp = tokenizer.tokenize_with_weights(compiled_prompt)["gemma"]
         ids = torch.tensor([[t[0] for t in tp]], device="cuda")
@@ -121,63 +105,38 @@ def _encode_nf4(compiled_prompt, gemma_path, pipeline_path):
         hs_cpu = tuple(h.cpu() for h in out.hidden_states)
         mask_cpu = mask.cpu()
 
-        # Free Gemma from GPU before running embeddings processor
+        # Free Gemma
         del gemma_model, out, ids, mask
         gc.collect()
         torch.cuda.empty_cache()
 
-        _vram = torch.cuda.memory_allocated() / 1e9
-        logger.info("VRAM after Gemma freed: %.2fGB", _vram)
-
-        # Run embeddings processor on GPU (now free)
-        emb_proc = emb_proc.cuda()
-        _vram = torch.cuda.memory_allocated() / 1e9
-        logger.info("VRAM after emb_proc to GPU: %.2fGB", _vram)
-        hs_gpu = tuple(h.cuda() for h in hs_cpu)
-        mask_gpu = mask_cpu.cuda()
+        # Step 4: Run embeddings processor on CPU (6.2GB model, no VRAM needed)
+        emb = emb_proc.process_hidden_states(hs_cpu, mask_cpu)
+        vc = emb.video_encoding.cuda()
+        ac = emb.audio_encoding.cuda()
         del hs_cpu, mask_cpu
 
-        emb = emb_proc.process_hidden_states(hs_gpu, mask_gpu)
-        vc = emb.video_encoding
-        ac = emb.audio_encoding
-
-    # Step 4: Free everything
-    del emb_proc, tokenizer, emb, hs_gpu, mask_gpu
+    del emb_proc, tokenizer, emb
     gc.collect()
     torch.cuda.empty_cache()
 
     return vc, ac
 
 
-def _encode_bf16(compiled_prompt, gemma_path, pipeline_path):
-    """Encode prompt using bf16 Gemma via pipeline prompt encoder."""
-    _free_vram()
-
-    pipeline = DistilledPipeline(
-        distilled_checkpoint_path=pipeline_path,
-        gemma_root=gemma_path,
-        spatial_upsampler_path=None,
-        loras=[],
-        offload_mode=OffloadMode.CPU,
-    )
-
-    with torch.inference_mode():
-        (emb,) = pipeline.prompt_encoder([compiled_prompt])
-        vc = emb.video_encoding
-        ac = emb.audio_encoding
-
-    del pipeline
-    gc.collect()
-    torch.cuda.empty_cache()
-    return vc, ac
+def _get_default_gemma(quantize):
+    """Get the default Gemma model path for a quantization mode."""
+    if quantize == "nf4":
+        return DEFAULT_GEMMA_NF4
+    return DEFAULT_GEMMA_BF16
 
 
 class ScenemaAudioTextEncode:
     """Encodes text prompts via Gemma 3 12B for the audio diffusion model.
 
-    Supports two quantization modes:
-    - nf4: BitsAndBytes 4-bit (~8 GB VRAM, fast)
-    - bf16: Full precision via pipeline prompt encoder
+    Quantization modes:
+    - nf4: Pre-quantized NF4 on GPU. Fast. Needs 12GB+ VRAM.
+    - cpu: bf16 split across CPU/GPU. Slower but works on 8GB cards.
+    - bf16: Full precision on GPU. Best quality. Needs 40GB+ VRAM.
     """
 
     CATEGORY = "Scenema Audio"
@@ -193,20 +152,59 @@ class ScenemaAudioTextEncode:
                 "model": ("SA_MODEL",),
             },
             "optional": {
-                "gemma_path": ("STRING", {"default": DEFAULT_GEMMA}),
-                "quantize": (["nf4", "bf16"], {"default": "nf4"}),
+                "gemma_path": ("STRING", {"default": "auto"}),
+                "quantize": (["auto", "nf4", "cpu", "bf16"], {"default": "auto"}),
             },
         }
 
-    def encode(self, compiled_prompt, model, gemma_path=DEFAULT_GEMMA, quantize="nf4"):
-        logger.info("Encoding prompt with Gemma (%s)...", quantize)
+    def encode(self, compiled_prompt, model, gemma_path="auto", quantize="auto"):
+        vram_gb = torch.cuda.get_device_properties(0).total_memory / 1e9
+
+        # Auto-detect best mode based on VRAM
+        if quantize == "auto":
+            if vram_gb >= 40:
+                quantize = "bf16"
+            elif vram_gb >= 12:
+                quantize = "nf4"
+            else:
+                quantize = "cpu"
+            logger.info("VRAM %.0fGB: auto-selected quantize=%s", vram_gb, quantize)
+
+        # Resolve default gemma path based on mode
+        if gemma_path == "auto":
+            gemma_path = _get_default_gemma(quantize)
+
         gemma_local = _resolve_gemma_path(gemma_path)
         pipeline_path = download_model(PIPELINE_CKPT)
 
+        logger.info("Encoding prompt with Gemma (%s, %s)...", quantize, gemma_path)
+
         if quantize == "nf4":
-            vc, ac = _encode_nf4(compiled_prompt, gemma_local, pipeline_path)
+            # Pre-quantized NF4 — all on GPU
+            load_kwargs = {
+                "device_map": "auto",
+                "max_memory": {0: f"{int(vram_gb - 2)}GiB", "cpu": "32GiB"},
+                "dtype": torch.bfloat16,
+            }
+            vc, ac = _encode_gemma(compiled_prompt, gemma_local, pipeline_path, load_kwargs)
+
+        elif quantize == "cpu":
+            # bf16 split across CPU and GPU — fits 8GB cards
+            max_gpu = f"{int(vram_gb - 2)}GiB"
+            load_kwargs = {
+                "device_map": "auto",
+                "max_memory": {0: max_gpu, "cpu": "32GiB"},
+                "dtype": torch.bfloat16,
+            }
+            vc, ac = _encode_gemma(compiled_prompt, gemma_local, pipeline_path, load_kwargs)
+
         else:
-            vc, ac = _encode_bf16(compiled_prompt, gemma_local, pipeline_path)
+            # bf16 all on GPU
+            load_kwargs = {
+                "device_map": "cuda",
+                "dtype": torch.bfloat16,
+            }
+            vc, ac = _encode_gemma(compiled_prompt, gemma_local, pipeline_path, load_kwargs)
 
         logger.info("Text encoding complete")
         return ({"video_context": vc, "audio_context": ac},)

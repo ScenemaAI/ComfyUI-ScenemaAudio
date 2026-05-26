@@ -22,7 +22,7 @@ from .sampler import (
     _build_pixel_shape, _build_video_state, _build_audio_state,
     _apply_a2v_reference, _strip_reference_frames,
 )
-from .text_encode import _encode_nf4, _encode_bf16, _resolve_gemma_path
+from .text_encode import _encode_gemma, _resolve_gemma_path, _get_default_gemma
 from .utils import FPS, download_model, PIPELINE_CKPT
 
 from ltx_core.batch_split import BatchSplitAdapter
@@ -162,14 +162,14 @@ class ScenemaAudioMusicGenerate:
                     "multiline": False,
                     "default": "",
                 }),
-                "gemma_path": ("STRING", {"default": "unsloth/gemma-3-12b-it-bnb-4bit"}),
-                "quantize": (["nf4", "bf16"], {"default": "nf4"}),
+                "gemma_path": ("STRING", {"default": "auto"}),
+                "quantize": (["auto", "nf4", "cpu", "bf16"], {"default": "auto"}),
             },
         }
 
     @torch.inference_mode()
     def generate(self, model, vae, description, duration_s, seed,
-                 scene="", gemma_path="unsloth/gemma-3-12b-it-bnb-4bit", quantize="nf4"):
+                 scene="", gemma_path="auto", quantize="auto"):
 
         prompt = _compile_music_prompt(description, scene)
         num_chunks = max(1, math.ceil(duration_s / MAX_CHUNK_DURATION))
@@ -178,13 +178,30 @@ class ScenemaAudioMusicGenerate:
         logger.info("Music generate: %.1fs total, %d chunk(s) of %.1fs",
                      duration_s, num_chunks, chunk_duration)
 
-        # Encode prompt once (same for all chunks)
+        # Auto-detect quantization
+        vram_gb = torch.cuda.get_device_properties(0).total_memory / 1e9
+        if quantize == "auto":
+            if vram_gb >= 40:
+                quantize = "bf16"
+            elif vram_gb >= 12:
+                quantize = "nf4"
+            else:
+                quantize = "cpu"
+
+        if gemma_path == "auto":
+            gemma_path = _get_default_gemma(quantize)
+
         gemma_local = _resolve_gemma_path(gemma_path)
         pipeline_path = download_model(PIPELINE_CKPT)
+
         if quantize == "nf4":
-            vc, ac = _encode_nf4(prompt, gemma_local, pipeline_path)
+            load_kwargs = {"device_map": "auto", "max_memory": {0: f"{int(vram_gb - 2)}GiB", "cpu": "32GiB"}, "dtype": torch.bfloat16}
+        elif quantize == "cpu":
+            load_kwargs = {"device_map": "auto", "max_memory": {0: f"{int(vram_gb - 2)}GiB", "cpu": "32GiB"}, "dtype": torch.bfloat16}
         else:
-            vc, ac = _encode_bf16(prompt, gemma_local, pipeline_path)
+            load_kwargs = {"device_map": "cuda", "dtype": torch.bfloat16}
+
+        vc, ac = _encode_gemma(prompt, gemma_local, pipeline_path, load_kwargs)
 
         waveforms = []
         ref_latent = None

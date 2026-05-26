@@ -28,7 +28,7 @@ from .sampler import (
     _build_pixel_shape, _build_video_state, _build_audio_state,
     _apply_a2v_reference, _strip_reference_frames,
 )
-from .text_encode import _encode_nf4, _encode_bf16, _resolve_gemma_path
+from .text_encode import _encode_gemma, _resolve_gemma_path, _free_vram, _get_default_gemma
 from .utils import FPS, download_model, PIPELINE_CKPT
 
 # Ensure audio_core is importable
@@ -61,13 +61,42 @@ def _log_vram(label):
 
 def _encode_text(model_data, compiled_prompt, gemma_path, quantize):
     """Encode a single chunk's prompt via Gemma."""
+    vram_gb = torch.cuda.get_device_properties(0).total_memory / 1e9
+
+    # Auto-detect best mode
+    if quantize == "auto":
+        if vram_gb >= 40:
+            quantize = "bf16"
+        elif vram_gb >= 12:
+            quantize = "nf4"
+        else:
+            quantize = "cpu"
+
+    if gemma_path == "auto":
+        gemma_path = _get_default_gemma(quantize)
+
     gemma_local = _resolve_gemma_path(gemma_path)
     pipeline_path = download_model(PIPELINE_CKPT)
 
     if quantize == "nf4":
-        return _encode_nf4(compiled_prompt, gemma_local, pipeline_path)
+        load_kwargs = {
+            "device_map": "auto",
+            "max_memory": {0: f"{int(vram_gb - 2)}GiB", "cpu": "32GiB"},
+            "dtype": torch.bfloat16,
+        }
+    elif quantize == "cpu":
+        load_kwargs = {
+            "device_map": "auto",
+            "max_memory": {0: f"{int(vram_gb - 2)}GiB", "cpu": "32GiB"},
+            "dtype": torch.bfloat16,
+        }
     else:
-        return _encode_bf16(compiled_prompt, gemma_local, pipeline_path)
+        load_kwargs = {
+            "device_map": "cuda",
+            "dtype": torch.bfloat16,
+        }
+
+    return _encode_gemma(compiled_prompt, gemma_local, pipeline_path, load_kwargs)
 
 
 def _sample_chunk(model_data, vc, ac, duration_s, seed, ref_latent=None):
@@ -249,8 +278,8 @@ class ScenemaAudioExtendedGenerate:
                 "pace": ("FLOAT", {
                     "default": 1.5, "min": 0.5, "max": 3.0, "step": 0.1,
                 }),
-                "gemma_path": ("STRING", {"default": "unsloth/gemma-3-12b-it-bnb-4bit"}),
-                "quantize": (["nf4", "bf16"], {"default": "nf4"}),
+                "gemma_path": ("STRING", {"default": "auto"}),
+                "quantize": (["auto", "nf4", "cpu", "bf16"], {"default": "auto"}),
                 "ref_latent": ("SA_LATENT",),
                 "xml_prompt": ("STRING", {"forceInput": True, "default": ""}),
                 "validate": ("BOOLEAN", {"default": False}),
@@ -269,7 +298,7 @@ class ScenemaAudioExtendedGenerate:
 
     @torch.inference_mode()
     def generate(self, model, vae, compiled_prompt, speech_text, seed,
-                 pace=1.5, gemma_path="unsloth/gemma-3-12b-it-bnb-4bit", quantize="nf4",
+                 pace=1.5, gemma_path="auto", quantize="auto",
                  ref_latent=None, xml_prompt="", validate=False, min_match_ratio=0.90,
                  skip_vc=False, vc_steps=25, vc_cfg_rate=0.5):
 

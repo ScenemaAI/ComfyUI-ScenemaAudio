@@ -24,7 +24,7 @@ from ltx_pipelines.utils.samplers import euler_denoising_loop
 from .sampler import (
     _build_pixel_shape, _build_video_state, _build_audio_state,
 )
-from .text_encode import _encode_nf4, _encode_bf16, _resolve_gemma_path
+from .text_encode import _encode_gemma, _resolve_gemma_path, _get_default_gemma
 from .utils import download_model, PIPELINE_CKPT
 
 _pkg_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -72,15 +72,15 @@ class ScenemaAudioVoiceDesign:
                     "default": VOICE_DESIGN_TEXT,
                 }),
                 "scene": ("STRING", {"default": ""}),
-                "gemma_path": ("STRING", {"default": "unsloth/gemma-3-12b-it-bnb-4bit"}),
-                "quantize": (["nf4", "bf16"], {"default": "nf4"}),
+                "gemma_path": ("STRING", {"default": "auto"}),
+                "quantize": (["auto", "nf4", "cpu", "bf16"], {"default": "auto"}),
             },
         }
 
     @torch.inference_mode()
     def design(self, model, vae, voice, gender, seed,
                preview_text=VOICE_DESIGN_TEXT, scene="",
-               gemma_path="unsloth/gemma-3-12b-it-bnb-4bit", quantize="nf4"):
+               gemma_path="auto", quantize="auto"):
 
         # Build XML and compile
         attrs = f'voice="{voice}" gender="{gender}"'
@@ -90,12 +90,29 @@ class ScenemaAudioVoiceDesign:
         result = compile_prompt(xml)
 
         # Encode text
+        vram_gb = torch.cuda.get_device_properties(0).total_memory / 1e9
+        if quantize == "auto":
+            if vram_gb >= 40:
+                quantize = "bf16"
+            elif vram_gb >= 12:
+                quantize = "nf4"
+            else:
+                quantize = "cpu"
+
+        if gemma_path == "auto":
+            gemma_path = _get_default_gemma(quantize)
+
         gemma_local = _resolve_gemma_path(gemma_path)
         pipeline_path = download_model(PIPELINE_CKPT)
+
         if quantize == "nf4":
-            vc, ac = _encode_nf4(result.prompt, gemma_local, pipeline_path)
+            load_kwargs = {"device_map": "auto", "max_memory": {0: f"{int(vram_gb - 2)}GiB", "cpu": "32GiB"}, "dtype": torch.bfloat16}
+        elif quantize == "cpu":
+            load_kwargs = {"device_map": "auto", "max_memory": {0: f"{int(vram_gb - 2)}GiB", "cpu": "32GiB"}, "dtype": torch.bfloat16}
         else:
-            vc, ac = _encode_bf16(result.prompt, gemma_local, pipeline_path)
+            load_kwargs = {"device_map": "cuda", "dtype": torch.bfloat16}
+
+        vc, ac = _encode_gemma(result.prompt, gemma_local, pipeline_path, load_kwargs)
 
         # Sample single chunk at fixed 15s
         mdl_wrapper = model["model"]
