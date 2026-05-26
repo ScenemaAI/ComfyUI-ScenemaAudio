@@ -221,8 +221,6 @@ class ScenemaAudioTextEncode:
         if quantize == "auto":
             if vram_gb >= 40:
                 quantize = "bf16"
-            elif vram_gb >= 12:
-                quantize = "nf4"
             else:
                 quantize = "cpu"
             logger.info("VRAM %.0fGB: auto-selected quantize=%s", vram_gb, quantize)
@@ -236,8 +234,12 @@ class ScenemaAudioTextEncode:
 
         logger.info("Encoding prompt with Gemma (%s, %s)...", quantize, gemma_path)
 
+        # NF4 pre-quantized must load entirely on GPU (bnb can't split CPU/GPU).
+        # bf16/cpu mode caps at 6GB to match transformer peak (~5.5GB).
+        gemma_gpu_cap = "6GiB"
+
         if quantize == "nf4":
-            # Pre-quantized NF4 — all on GPU
+            # Pre-quantized NF4 — needs full GPU (~8GB), can't split
             load_kwargs = {
                 "device_map": "auto",
                 "max_memory": {0: f"{int(vram_gb - 2)}GiB", "cpu": "32GiB"},
@@ -247,10 +249,9 @@ class ScenemaAudioTextEncode:
 
         elif quantize == "cpu":
             # bf16 split across CPU and GPU — fits 8GB cards
-            max_gpu = f"{int(vram_gb - 2)}GiB"
             load_kwargs = {
                 "device_map": "auto",
-                "max_memory": {0: max_gpu, "cpu": "32GiB"},
+                "max_memory": {0: gemma_gpu_cap, "cpu": "32GiB"},
                 "dtype": torch.bfloat16,
             }
             vc, ac = _encode_gemma(compiled_prompt, gemma_local, pipeline_path, load_kwargs)

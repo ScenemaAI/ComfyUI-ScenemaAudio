@@ -72,8 +72,6 @@ def _encode_text(model_data, compiled_prompt, gemma_path, quantize):
     if quantize == "auto":
         if vram_gb >= 40:
             quantize = "bf16"
-        elif vram_gb >= 12:
-            quantize = "nf4"
         else:
             quantize = "cpu"
 
@@ -398,10 +396,18 @@ class ScenemaAudioExtendedGenerate:
         # Build Gemma load kwargs
         if quantize == "bf16":
             load_kwargs = {"device_map": "cuda", "dtype": torch.bfloat16}
-        else:
+        elif quantize == "nf4":
+            # NF4 pre-quantized must load entirely on GPU (bnb can't split)
             load_kwargs = {
                 "device_map": "auto",
                 "max_memory": {0: f"{int(vram_gb - 2)}GiB", "cpu": "32GiB"},
+                "dtype": torch.bfloat16,
+            }
+        else:
+            # CPU mode: cap at 6GB to match transformer peak
+            load_kwargs = {
+                "device_map": "auto",
+                "max_memory": {0: "6GiB", "cpu": "32GiB"},
                 "dtype": torch.bfloat16,
             }
 
