@@ -38,6 +38,58 @@ def _resolve_gemma_path(gemma_path):
     return snapshot_download(gemma_path)
 
 
+def _strip_video_components(emb_proc):
+    """Remove video-only components from the embeddings processor.
+
+    Deletes video_aggregate_embed (1.5GB) and video_connector (3.5GB),
+    keeping only audio_aggregate_embed (~0.7GB) and audio_connector (~0.5GB).
+    Reduces emb_proc from 6.2GB to ~1.3GB so it fits on GPU.
+    """
+    if hasattr(emb_proc, 'feature_extractor'):
+        fe = emb_proc.feature_extractor
+        if hasattr(fe, 'video_aggregate_embed'):
+            del fe.video_aggregate_embed
+            fe.video_aggregate_embed = None
+    if hasattr(emb_proc, 'video_connector'):
+        del emb_proc.video_connector
+        emb_proc.video_connector = None
+    gc.collect()
+
+
+def _audio_only_embeddings(emb_proc, hidden_states, attention_mask):
+    """Run only the audio path of the embeddings processor.
+
+    Bypasses the video feature extractor and video connector entirely.
+    Returns (vc, ac) where vc is a dummy zero tensor for sampler compatibility.
+    """
+    from ltx_core.text_encoders.gemma.embeddings_processor import convert_to_additive_mask, _to_binary_mask
+
+    fe = emb_proc.feature_extractor
+
+    # Run feature extractor's audio path only
+    encoded = torch.stack(hidden_states, dim=-1) if isinstance(hidden_states, (list, tuple)) else hidden_states
+
+    # norm_and_concat_per_token_rms (inline from feature_extractor)
+    from ltx_core.text_encoders.gemma.feature_extractor import norm_and_concat_per_token_rms, _rescale_norm
+    normed = norm_and_concat_per_token_rms(encoded, attention_mask)
+    normed = normed.to(encoded.dtype)
+
+    a_dim = fe.audio_aggregate_embed.out_features
+    audio_feats = fe.audio_aggregate_embed(_rescale_norm(normed, a_dim, fe.embedding_dim))
+    del encoded, normed
+
+    # Run audio connector only
+    additive_mask = convert_to_additive_mask(attention_mask, audio_feats.dtype)
+    audio_encoded, _ = emb_proc.audio_connector(audio_feats, additive_mask)
+    del audio_feats, additive_mask
+
+    # Dummy video encoding (zeros) — sampler needs it but audio-only model ignores it
+    vc = torch.zeros(1, audio_encoded.shape[1], 4096, device=audio_encoded.device, dtype=audio_encoded.dtype)
+    ac = audio_encoded
+
+    return vc, ac
+
+
 def _free_vram():
     """Free all GPU memory before loading a large model."""
     comfy.model_management.unload_all_models()
@@ -110,11 +162,16 @@ def _encode_gemma(compiled_prompt, gemma_path, pipeline_path, load_kwargs):
         gc.collect()
         torch.cuda.empty_cache()
 
-        # Step 4: Run embeddings processor on CPU (6.2GB model, no VRAM needed)
-        emb = emb_proc.process_hidden_states(hs_cpu, mask_cpu)
-        vc = emb.video_encoding.cuda()
-        ac = emb.audio_encoding.cuda()
+        # Run audio-only embeddings on GPU.
+        # Strip video components (5GB) and run only audio path (~1.3GB) on GPU.
+        _strip_video_components(emb_proc)
+        emb_proc = emb_proc.cuda()
+        hs_gpu = tuple(h.cuda() for h in hs_cpu)
+        mask_gpu = mask_cpu.cuda()
         del hs_cpu, mask_cpu
+
+        vc, ac = _audio_only_embeddings(emb_proc, hs_gpu, mask_gpu)
+        del hs_gpu, mask_gpu
 
     del emb_proc, tokenizer, emb
     gc.collect()
