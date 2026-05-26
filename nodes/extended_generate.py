@@ -324,21 +324,31 @@ class ScenemaAudioExtendedGenerate:
         mdl_wrapper.to(device)
         _log_vram("transformer on GPU")
 
+        # Move all encodings to CPU to free VRAM for transformer + diffusion
+        chunk_encodings_cpu = [(vc.cpu(), ac.cpu()) for vc, ac in chunk_encodings]
+        del chunk_encodings
+        torch.cuda.empty_cache()
+
         waveforms = []
         sr = None
-        current_ref = ref_latent
-        for i, (chunk, (vc, ac)) in enumerate(zip(chunks, chunk_encodings)):
+        current_ref = ref_latent.cpu() if ref_latent is not None else None
+        for i, (chunk, (vc_cpu, ac_cpu)) in enumerate(zip(chunks, chunk_encodings_cpu)):
             logger.info("  Diffuse chunk %d/%d (%.1fs)", i + 1, len(chunks), chunk.duration_s)
+            # Move this chunk's encoding to GPU just for diffusion
+            vc = vc_cpu.to(device)
+            ac = ac_cpu.to(device)
+            ref_gpu = current_ref.to(device) if current_ref is not None else None
             latent = self._diffuse_chunk(mdl_wrapper, device, vc, ac,
-                                          chunk.duration_s, chunk.seed, current_ref)
+                                          chunk.duration_s, chunk.seed, ref_gpu)
+            del vc, ac, ref_gpu
 
             # Decode immediately (VAE builds/destroys per call, coexists with transformer)
             waveform, sr = _decode_latent(vae, latent)
             waveforms.append(waveform)
 
-            # A2V: encode tail for next chunk
+            # A2V: encode tail for next chunk, keep on CPU
             if i < len(chunks) - 1:
-                current_ref = _encode_reference(vae, waveform, sr)
+                current_ref = _encode_reference(vae, waveform, sr).cpu()
 
         mdl_wrapper.to("cpu")
         torch.cuda.empty_cache()
