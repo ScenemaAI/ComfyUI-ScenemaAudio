@@ -23,7 +23,7 @@ from ltx_pipelines.distilled import DistilledPipeline
 from ltx_pipelines.utils.types import OffloadMode
 from transformers import BitsAndBytesConfig, Gemma3ForConditionalGeneration
 
-from .utils import download_model, PIPELINE_CKPT
+from .utils import download_model, PIPELINE_AUDIO_CKPT
 
 logger = logging.getLogger(__name__)
 
@@ -230,7 +230,7 @@ class ScenemaAudioTextEncode:
             gemma_path = _get_default_gemma(quantize)
 
         gemma_local = _resolve_gemma_path(gemma_path)
-        pipeline_path = download_model(PIPELINE_CKPT)
+        pipeline_path = download_model(PIPELINE_AUDIO_CKPT)
 
         logger.info("Encoding prompt with Gemma (%s, %s)...", quantize, gemma_path)
 

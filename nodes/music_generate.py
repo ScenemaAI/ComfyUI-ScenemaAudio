@@ -23,7 +23,7 @@ from .sampler import (
     _apply_a2v_reference, _strip_reference_frames,
 )
 from .text_encode import _encode_gemma, _resolve_gemma_path, _get_default_gemma
-from .utils import FPS, download_model, PIPELINE_CKPT
+from .utils import FPS, download_model, PIPELINE_AUDIO_CKPT
 
 from ltx_core.batch_split import BatchSplitAdapter
 from ltx_core.components.diffusion_steps import EulerDiffusionStep
@@ -192,7 +192,7 @@ class ScenemaAudioMusicGenerate:
             gemma_path = _get_default_gemma(quantize)
 
         gemma_local = _resolve_gemma_path(gemma_path)
-        pipeline_path = download_model(PIPELINE_CKPT)
+        pipeline_path = download_model(PIPELINE_AUDIO_CKPT)
 
         if quantize == "nf4":
             load_kwargs = {"device_map": "auto", "max_memory": {0: f"{int(vram_gb - 2)}GiB", "cpu": "32GiB"}, "dtype": torch.bfloat16}

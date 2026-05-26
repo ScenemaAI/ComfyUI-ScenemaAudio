@@ -34,7 +34,7 @@ from .text_encode import (
     _encode_gemma, _resolve_gemma_path, _free_vram, _get_default_gemma,
     _build_embeddings_processor, _strip_video_components, _audio_only_embeddings,
 )
-from .utils import FPS, download_model, PIPELINE_CKPT
+from .utils import FPS, download_model, PIPELINE_AUDIO_CKPT
 
 # Ensure audio_core is importable
 _pkg_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -79,7 +79,7 @@ def _encode_text(model_data, compiled_prompt, gemma_path, quantize):
         gemma_path = _get_default_gemma(quantize)
 
     gemma_local = _resolve_gemma_path(gemma_path)
-    pipeline_path = download_model(PIPELINE_CKPT)
+    pipeline_path = download_model(PIPELINE_AUDIO_CKPT)
 
     if quantize == "nf4":
         load_kwargs = {
@@ -386,7 +386,7 @@ class ScenemaAudioExtendedGenerate:
             gemma_path = _get_default_gemma(quantize)
 
         gemma_local = _resolve_gemma_path(gemma_path)
-        pipeline_path = download_model(PIPELINE_CKPT)
+        pipeline_path = download_model(PIPELINE_AUDIO_CKPT)
 
         _free_vram()
 

@@ -25,7 +25,7 @@ from .sampler import (
     _build_pixel_shape, _build_video_state, _build_audio_state,
 )
 from .text_encode import _encode_gemma, _resolve_gemma_path, _get_default_gemma
-from .utils import download_model, PIPELINE_CKPT
+from .utils import download_model, PIPELINE_AUDIO_CKPT
 
 _pkg_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _pkg_root not in sys.path:
@@ -103,7 +103,7 @@ class ScenemaAudioVoiceDesign:
             gemma_path = _get_default_gemma(quantize)
 
         gemma_local = _resolve_gemma_path(gemma_path)
-        pipeline_path = download_model(PIPELINE_CKPT)
+        pipeline_path = download_model(PIPELINE_AUDIO_CKPT)
 
         if quantize == "nf4":
             load_kwargs = {"device_map": "auto", "max_memory": {0: f"{int(vram_gb - 2)}GiB", "cpu": "32GiB"}, "dtype": torch.bfloat16}

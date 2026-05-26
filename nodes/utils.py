@@ -29,6 +29,7 @@ HF_REPO = "ScenemaAI/scenema-audio"
 TRANSFORMER_BF16 = "scenema-audio-transformer.safetensors"
 TRANSFORMER_INT8 = "scenema-audio-transformer-int8.safetensors"
 PIPELINE_CKPT = "scenema-audio-pipeline.safetensors"
+PIPELINE_AUDIO_CKPT = "scenema-audio-pipeline-audio.safetensors"
 VAE_ENCODER_CKPT = "scenema-audio-vae-encoder.safetensors"
 
 FPS = 24

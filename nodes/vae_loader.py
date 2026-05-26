@@ -16,7 +16,7 @@ from ltx_pipelines.distilled import AudioDecoder
 from safetensors import safe_open
 
 from .utils import (
-    PIPELINE_CKPT,
+    PIPELINE_AUDIO_CKPT,
     VAE_ENCODER_CKPT,
     download_model,
     load_vae_encoder,
@@ -46,7 +46,7 @@ class ScenemaAudioVAELoader:
 
     def load(self):
         logger.info("Downloading/loading VAE checkpoints...")
-        pipeline_path = download_model(PIPELINE_CKPT)
+        pipeline_path = download_model(PIPELINE_AUDIO_CKPT)
         encoder_path = download_model(VAE_ENCODER_CKPT)
 
         # Load audio decoder directly (no Gemma dependency)
