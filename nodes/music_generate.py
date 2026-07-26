@@ -22,7 +22,10 @@ from .sampler import (
     _build_pixel_shape, _build_video_state, _build_audio_state,
     _apply_a2v_reference, _strip_reference_frames,
 )
-from .text_encode import _encode_gemma, _resolve_gemma_path, _get_default_gemma
+from .text_encode import (
+    _auto_quantize, _build_gemma_load_kwargs, _encode_gemma,
+    _get_default_gemma, _resolve_gemma_path,
+)
 from .utils import FPS, download_model, PIPELINE_AUDIO_CKPT
 
 from ltx_core.batch_split import BatchSplitAdapter
@@ -47,12 +50,8 @@ def _compile_music_prompt(description, scene):
     return " ".join(parts)
 
 
-def _sample(model_data, vc, ac, duration_s, seed, ref_latent=None):
-    """Run diffusion sampling for a single chunk."""
-    mdl_wrapper = model_data["model"]
-    device = model_data["device"]
-    mdl_wrapper.to(device)
-
+def _sample_one(mdl_wrapper, device, vc, ac, duration_s, seed, ref_latent=None):
+    """Run diffusion for one chunk. Transformer must already be on GPU."""
     pixel_shape = _build_pixel_shape(duration_s)
     gen = torch.Generator(device=device).manual_seed(seed)
     noiser = GaussianNoiser(generator=gen)
@@ -84,9 +83,6 @@ def _sample(model_data, vc, ac, duration_s, seed, ref_latent=None):
 
     audio_state_out = audio_tools.clear_conditioning(audio_state_out)
     audio_state_out = audio_tools.unpatchify(audio_state_out)
-
-    mdl_wrapper.to("cpu")
-    torch.cuda.empty_cache()
 
     return audio_state_out.latent
 
@@ -163,7 +159,7 @@ class ScenemaAudioMusicGenerate:
                     "default": "",
                 }),
                 "gemma_path": ("STRING", {"default": "auto"}),
-                "quantize": (["auto", "nf4", "cpu", "bf16"], {"default": "auto"}),
+                "quantize": (["auto", "nf4", "bf16", "cpu"], {"default": "auto"}),
             },
         }
 
@@ -178,15 +174,9 @@ class ScenemaAudioMusicGenerate:
         logger.info("Music generate: %.1fs total, %d chunk(s) of %.1fs",
                      duration_s, num_chunks, chunk_duration)
 
-        # Auto-detect quantization
         vram_gb = torch.cuda.get_device_properties(0).total_memory / 1e9
         if quantize == "auto":
-            if vram_gb >= 40:
-                quantize = "bf16"
-            elif vram_gb >= 12:
-                quantize = "nf4"
-            else:
-                quantize = "cpu"
+            quantize = _auto_quantize(vram_gb)
 
         if gemma_path == "auto":
             gemma_path = _get_default_gemma(quantize)
@@ -194,33 +184,35 @@ class ScenemaAudioMusicGenerate:
         gemma_local = _resolve_gemma_path(gemma_path)
         pipeline_path = download_model(PIPELINE_AUDIO_CKPT)
 
-        if quantize == "nf4":
-            load_kwargs = {"device_map": "auto", "max_memory": {0: f"{int(vram_gb - 2)}GiB", "cpu": "32GiB"}, "dtype": torch.bfloat16}
-        elif quantize == "cpu":
-            load_kwargs = {"device_map": "auto", "max_memory": {0: f"{int(vram_gb - 2)}GiB", "cpu": "32GiB"}, "dtype": torch.bfloat16}
-        else:
-            load_kwargs = {"device_map": "cuda", "dtype": torch.bfloat16}
+        load_kwargs = _build_gemma_load_kwargs(quantize, vram_gb)
+        vc, ac = _encode_gemma(prompt, gemma_local, pipeline_path, load_kwargs, quantize)
 
-        vc, ac = _encode_gemma(prompt, gemma_local, pipeline_path, load_kwargs)
+        # Move transformer to GPU ONCE for all chunks (was per-chunk before).
+        mdl_wrapper = model["model"]
+        device = model["device"]
+        mdl_wrapper.to(device)
 
         waveforms = []
         ref_latent = None
         sr = None
 
         for i in range(num_chunks):
-            # Last chunk may be shorter
             this_duration = min(chunk_duration, duration_s - i * chunk_duration)
             this_seed = seed + i * 1000
 
             logger.info("Chunk %d/%d (%.1fs, seed=%d)", i + 1, num_chunks,
                          this_duration, this_seed)
 
-            latent = _sample(model, vc, ac, this_duration, this_seed, ref_latent)
+            latent = _sample_one(mdl_wrapper, device, vc, ac,
+                                 this_duration, this_seed, ref_latent)
             waveform, sr = _decode(vae, latent)
             waveforms.append(waveform)
 
             if i < num_chunks - 1:
                 ref_latent = _encode_tail(vae, waveform, sr)
+
+        # Transformer stays on GPU across generations. See sampler.py note.
+        torch.cuda.empty_cache()
 
         combined = torch.cat([w.squeeze(0) for w in waveforms], dim=-1).unsqueeze(0)
         total = combined.shape[-1] / sr

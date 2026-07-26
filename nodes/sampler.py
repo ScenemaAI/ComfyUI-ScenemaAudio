@@ -191,7 +191,9 @@ class ScenemaAudioSampler:
         if torch.isnan(audio_state_out.latent).any():
             logger.warning("NaN detected in denoised latent")
 
-        mdl_wrapper.to("cpu")
+        # Transformer stays on GPU. ComfyUI will evict via unload_all_models
+        # if another workflow needs the VRAM. Manually offloading here just
+        # forces a re-shuttle on the next sample call.
         torch.cuda.empty_cache()
 
         logger.info("Sampling complete")
