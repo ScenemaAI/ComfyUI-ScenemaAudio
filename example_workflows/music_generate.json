@@ -21,8 +21,8 @@
       "duration_s": 30,
       "seed": 0,
       "scene": "",
-      "gemma_path": "unsloth/gemma-3-12b-it-bnb-4bit",
-      "quantize": "nf4",
+      "gemma_path": "auto",
+      "quantize": "auto",
       "model": [
         "1",
         0

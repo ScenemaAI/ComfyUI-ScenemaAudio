@@ -60,10 +60,8 @@
     "inputs": {
       "seed": 867474321250893,
       "pace": 1.5,
-      "gemma_path": "unsloth/gemma-3-12b-it-bnb-4bit",
-      "quantize": "nf4",
-      "validate": false,
-      "min_match_ratio": 0.9,
+      "gemma_path": "auto",
+      "quantize": "auto",
       "skip_vc": false,
       "vc_steps": 25,
       "vc_cfg_rate": 1,
@@ -139,8 +137,8 @@
       "duration_s": 60,
       "seed": 380146674029435,
       "scene": "",
-      "gemma_path": "unsloth/gemma-3-12b-it-bnb-4bit",
-      "quantize": "bf16",
+      "gemma_path": "auto",
+      "quantize": "auto",
       "model": [
         "17",
         0
@@ -191,8 +189,8 @@
       "seed": 820728406779544,
       "preview_text": "The old lighthouse had stood on the cliff for over a century, its beam cutting through the fog like a blade of light.",
       "scene": "",
-      "gemma_path": "unsloth/gemma-3-12b-it-bnb-4bit",
-      "quantize": "nf4",
+      "gemma_path": "auto",
+      "quantize": "auto",
       "model": [
         "21",
         0

@@ -60,10 +60,8 @@
     "inputs": {
       "seed": 0,
       "pace": 1.5,
-      "gemma_path": "unsloth/gemma-3-12b-it-bnb-4bit",
-      "quantize": "nf4",
-      "validate": false,
-      "min_match_ratio": 0.9,
+      "gemma_path": "auto",
+      "quantize": "auto",
       "skip_vc": false,
       "vc_steps": 25,
       "vc_cfg_rate": 0.5,

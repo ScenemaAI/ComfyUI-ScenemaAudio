@@ -22,8 +22,8 @@
       "seed": 0,
       "preview_text": "The old lighthouse had stood on the cliff for over a century, its beam cutting through the fog like a blade of light.",
       "scene": "",
-      "gemma_path": "unsloth/gemma-3-12b-it-bnb-4bit",
-      "quantize": "nf4",
+      "gemma_path": "auto",
+      "quantize": "auto",
       "model": [
         "1",
         0
