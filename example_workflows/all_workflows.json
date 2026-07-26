@@ -122,57 +122,6 @@
       "title": "Scenema Audio VAE Encode"
     }
   },
-  "17": {
-    "inputs": {
-      "precision": "int8"
-    },
-    "class_type": "ScenemaAudioModelLoader",
-    "_meta": {
-      "title": "Scenema Audio Model Loader"
-    }
-  },
-  "18": {
-    "inputs": {
-      "description": "Epic cinematic orchestral score, slow powerful build, deep cello and contrabass foundation, soaring violin melody, French horns swelling, timpani rolls, full orchestra crescendo",
-      "duration_s": 60,
-      "seed": 380146674029435,
-      "scene": "",
-      "gemma_path": "auto",
-      "quantize": "auto",
-      "model": [
-        "17",
-        0
-      ],
-      "vae": [
-        "19",
-        0
-      ]
-    },
-    "class_type": "ScenemaAudioMusicGenerate",
-    "_meta": {
-      "title": "Scenema Audio Music Generate"
-    }
-  },
-  "19": {
-    "inputs": {},
-    "class_type": "ScenemaAudioVAELoader",
-    "_meta": {
-      "title": "Scenema Audio VAE Loader"
-    }
-  },
-  "20": {
-    "inputs": {
-      "audioUI": "",
-      "audio": [
-        "18",
-        0
-      ]
-    },
-    "class_type": "PreviewAudio",
-    "_meta": {
-      "title": "Preview Audio"
-    }
-  },
   "21": {
     "inputs": {
       "precision": "int8"

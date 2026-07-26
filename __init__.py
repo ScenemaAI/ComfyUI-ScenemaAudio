@@ -30,7 +30,6 @@ try:
     from .nodes.seedvc import ScenemaAudioVoiceClone
     from .nodes.chunker import ScenemaAudioChunker, ScenemaAudioConcatenate
     from .nodes.extended_generate import ScenemaAudioExtendedGenerate
-    from .nodes.music_generate import ScenemaAudioMusicGenerate
     from .nodes.voice_design import ScenemaAudioVoiceDesign
 
     NODE_CLASS_MAPPINGS = {
@@ -46,7 +45,6 @@ try:
         "ScenemaAudioChunker": ScenemaAudioChunker,
         "ScenemaAudioConcatenate": ScenemaAudioConcatenate,
         "ScenemaAudioExtendedGenerate": ScenemaAudioExtendedGenerate,
-        "ScenemaAudioMusicGenerate": ScenemaAudioMusicGenerate,
         "ScenemaAudioVoiceDesign": ScenemaAudioVoiceDesign,
     }
 
@@ -63,7 +61,6 @@ try:
         "ScenemaAudioChunker": "Scenema Audio Chunker",
         "ScenemaAudioConcatenate": "Scenema Audio Concatenate",
         "ScenemaAudioExtendedGenerate": "Scenema Audio Extended Generate",
-        "ScenemaAudioMusicGenerate": "Scenema Audio Music Generate",
         "ScenemaAudioVoiceDesign": "Scenema Audio Voice Design",
     }
 
