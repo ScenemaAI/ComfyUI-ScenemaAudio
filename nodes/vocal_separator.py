@@ -2,10 +2,12 @@
 # https://scenema.ai
 # SPDX-License-Identifier: MIT
 
-"""Scenema Audio vocal separator node for ComfyUI.
+"""MelBandRoFormer utility for stripping background from generated speech.
 
-Separates vocals from background audio using MelBandRoFormer.
-Strips music, SFX, and ambient sounds from generated speech.
+No standalone ComfyUI node — the logic is invoked automatically by
+Extended Generate when the chosen scene implies studio-clean intent
+(Absolute silence, Broadcast studio) or when the user overrides via
+strip_background_sfx. See extended_generate.py for the decision logic.
 """
 
 import logging
@@ -18,23 +20,10 @@ import torchaudio
 from huggingface_hub import hf_hub_download
 from safetensors.torch import load_file
 
-# MelBandRoFormer architecture from kijai/ComfyUI-MelBandRoFormer
-_melband_path = os.environ.get("MELBAND_NODE_PATH", "")
-if not _melband_path:
-    for path in [
-        "/workspace/melband_roformer_node",
-        "/app/melband_roformer_node",
-        os.path.join(os.path.dirname(__file__), "..", "..", "ComfyUI-MelBandRoFormer"),
-    ]:
-        if os.path.isdir(path):
-            _melband_path = path
-            break
-
-if _melband_path and _melband_path not in sys.path:
-    sys.path.insert(0, _melband_path)
-
+# MelBandRoFormer architecture is vendored in vendor/mel_band_roformer/.
+# The parent __init__.py adds vendor/ to sys.path so this import works.
 try:
-    from model.mel_band_roformer import MelBandRoformer
+    from mel_band_roformer.mel_band_roformer import MelBandRoformer
 except ImportError:
     MelBandRoformer = None
 
@@ -77,9 +66,8 @@ def _load_melband_model():
     """Download and load MelBandRoFormer model."""
     if MelBandRoformer is None:
         raise ImportError(
-            "MelBandRoFormer architecture not found. Clone it with: "
-            "git clone https://github.com/kijai/ComfyUI-MelBandRoFormer "
-            "and set MELBAND_NODE_PATH environment variable."
+            "MelBandRoFormer architecture failed to import from vendor/. "
+            "Reinstall the ComfyUI-ScenemaAudio package."
         )
 
     model_path = hf_hub_download(repo_id=MELBAND_HF_REPO, filename=MELBAND_FILENAME)
@@ -135,58 +123,33 @@ def _chunked_inference(model, audio_np):
     return result
 
 
-class ScenemaAudioVocalSeparator:
-    """Separates vocals from background audio.
+def _run_separator(audio):
+    """Run MelBandRoFormer separation and return (vocals, background) waveforms."""
+    waveform = audio["waveform"]
+    sr = audio["sample_rate"]
+    wav = waveform[0]
 
-    Uses MelBandRoFormer to isolate speech from music, SFX, and ambient
-    sounds. Outputs clean vocals and separated background as standard
-    ComfyUI AUDIO types.
-    """
+    if sr != MELBAND_SR:
+        wav = torchaudio.functional.resample(wav.float(), sr, MELBAND_SR)
+    if wav.shape[0] == 1:
+        wav = wav.repeat(2, 1)
 
-    CATEGORY = "Scenema Audio"
-    FUNCTION = "separate"
-    RETURN_TYPES = ("AUDIO", "AUDIO")
-    RETURN_NAMES = ("vocals", "background")
+    audio_np = wav.numpy()
+    logger.info("Separating vocals (%.1fs audio)...", audio_np.shape[1] / MELBAND_SR)
 
-    @classmethod
-    def INPUT_TYPES(cls):
-        return {
-            "required": {
-                "audio": ("AUDIO",),
-            },
-        }
+    model = _load_melband_model()
+    vocals_np = _chunked_inference(model, audio_np)
+    del model
+    torch.cuda.empty_cache()
 
-    @torch.inference_mode()
-    def separate(self, audio):
-        waveform = audio["waveform"]
-        sr = audio["sample_rate"]
+    background_np = audio_np - vocals_np
 
-        wav = waveform[0]
+    vocals_t = torch.from_numpy(vocals_np).unsqueeze(0)
+    background_t = torch.from_numpy(background_np).unsqueeze(0)
+    if sr != MELBAND_SR:
+        vocals_t = torchaudio.functional.resample(vocals_t.float(), MELBAND_SR, sr)
+        background_t = torchaudio.functional.resample(background_t.float(), MELBAND_SR, sr)
 
-        if sr != MELBAND_SR:
-            wav = torchaudio.functional.resample(wav.float(), sr, MELBAND_SR)
+    return vocals_t, background_t, sr
 
-        if wav.shape[0] == 1:
-            wav = wav.repeat(2, 1)
 
-        audio_np = wav.numpy()
-
-        logger.info("Separating vocals (%.1fs audio)...", audio_np.shape[1] / MELBAND_SR)
-        model = _load_melband_model()
-        vocals_np = _chunked_inference(model, audio_np)
-        del model
-        torch.cuda.empty_cache()
-
-        background_np = audio_np - vocals_np
-
-        vocals_t = torch.from_numpy(vocals_np).unsqueeze(0)
-        background_t = torch.from_numpy(background_np).unsqueeze(0)
-        if sr != MELBAND_SR:
-            vocals_t = torchaudio.functional.resample(vocals_t.float(), MELBAND_SR, sr)
-            background_t = torchaudio.functional.resample(background_t.float(), MELBAND_SR, sr)
-
-        logger.info("Separation complete")
-        return (
-            {"waveform": vocals_t, "sample_rate": sr},
-            {"waveform": background_t, "sample_rate": sr},
-        )

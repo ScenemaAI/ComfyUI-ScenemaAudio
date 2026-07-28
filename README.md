@@ -22,7 +22,7 @@ Prompt Compiler → Text Encode → Sampler → Decode → PreviewAudio
                     Model Loader ──┘
 ```
 
-Pre-wired workflow JSON files are included in `example_workflows/`.
+The official pre-wired workflow is at `workflows/scenema_audio.json`.
 
 ## VRAM Requirements
 

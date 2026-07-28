@@ -12,56 +12,50 @@ import os
 import sys
 
 # Add vendored packages to sys.path before any node imports.
-# ltx_core, ltx_pipelines, and seedvc are vendored to avoid
-# external git dependencies and ensure one-click install.
+# ltx_core, ltx_pipelines, seedvc, and mel_band_roformer are vendored
+# to avoid external git dependencies and ensure one-click install.
 _vendor_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vendor")
 if _vendor_path not in sys.path:
     sys.path.insert(0, _vendor_path)
 
 try:
-    from .nodes.prompt_compiler import ScenemaAudioPromptCompiler
     from .nodes.model_loader import ScenemaAudioModelLoader
     from .nodes.vae_loader import ScenemaAudioVAELoader
     from .nodes.text_encode import ScenemaAudioTextEncode
     from .nodes.sampler import ScenemaAudioSampler
     from .nodes.decode import ScenemaAudioDecode
     from .nodes.vae_encode import ScenemaAudioVAEEncode
-    from .nodes.vocal_separator import ScenemaAudioVocalSeparator
+    from .nodes.load_audio_url import ScenemaAudioLoadAudioURL
     from .nodes.seedvc import ScenemaAudioVoiceClone
     from .nodes.chunker import ScenemaAudioChunker, ScenemaAudioConcatenate
-    from .nodes.extended_generate import ScenemaAudioExtendedGenerate
-    from .nodes.voice_design import ScenemaAudioVoiceDesign
+    from .nodes.generate import ScenemaAudioGenerate
 
     NODE_CLASS_MAPPINGS = {
-        "ScenemaAudioPromptCompiler": ScenemaAudioPromptCompiler,
         "ScenemaAudioModelLoader": ScenemaAudioModelLoader,
         "ScenemaAudioVAELoader": ScenemaAudioVAELoader,
         "ScenemaAudioTextEncode": ScenemaAudioTextEncode,
         "ScenemaAudioSampler": ScenemaAudioSampler,
         "ScenemaAudioDecode": ScenemaAudioDecode,
         "ScenemaAudioVAEEncode": ScenemaAudioVAEEncode,
-        "ScenemaAudioVocalSeparator": ScenemaAudioVocalSeparator,
+        "ScenemaAudioLoadAudioURL": ScenemaAudioLoadAudioURL,
         "ScenemaAudioVoiceClone": ScenemaAudioVoiceClone,
         "ScenemaAudioChunker": ScenemaAudioChunker,
         "ScenemaAudioConcatenate": ScenemaAudioConcatenate,
-        "ScenemaAudioExtendedGenerate": ScenemaAudioExtendedGenerate,
-        "ScenemaAudioVoiceDesign": ScenemaAudioVoiceDesign,
+        "ScenemaAudioGenerate": ScenemaAudioGenerate,
     }
 
     NODE_DISPLAY_NAME_MAPPINGS = {
-        "ScenemaAudioPromptCompiler": "Scenema Audio Prompt Compiler",
         "ScenemaAudioModelLoader": "Scenema Audio Model Loader",
         "ScenemaAudioVAELoader": "Scenema Audio VAE Loader",
         "ScenemaAudioTextEncode": "Scenema Audio Text Encode",
         "ScenemaAudioSampler": "Scenema Audio Sampler",
         "ScenemaAudioDecode": "Scenema Audio Decode",
         "ScenemaAudioVAEEncode": "Scenema Audio VAE Encode",
-        "ScenemaAudioVocalSeparator": "Scenema Audio Vocal Separator",
+        "ScenemaAudioLoadAudioURL": "Scenema Audio Load Audio from URL",
         "ScenemaAudioVoiceClone": "Scenema Audio Voice Clone",
         "ScenemaAudioChunker": "Scenema Audio Chunker",
         "ScenemaAudioConcatenate": "Scenema Audio Concatenate",
-        "ScenemaAudioExtendedGenerate": "Scenema Audio Extended Generate",
-        "ScenemaAudioVoiceDesign": "Scenema Audio Voice Design",
+        "ScenemaAudioGenerate": "Scenema Audio Generate",
     }
 
     __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]

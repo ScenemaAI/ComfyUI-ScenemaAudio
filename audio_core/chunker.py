@@ -52,7 +52,7 @@ def _get_kokoro():
     try:
         from kokoro import KPipeline
 
-        pipe = KPipeline(lang_code="a")
+        pipe = KPipeline(lang_code="a", device="cuda")
         # Verify it's a real Kokoro pipeline (not a mock in tests)
         if not hasattr(pipe, "__module__") or "kokoro" not in str(
             getattr(pipe, "__module__", "")

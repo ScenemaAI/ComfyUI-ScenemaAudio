@@ -17,14 +17,18 @@ from .utils import MAX_REF_SECONDS
 
 logger = logging.getLogger(__name__)
 
+# Hard cap on reference audio length. Longer clips don't improve voice
+# cloning quality and eat GPU memory during encoding.
+MAX_REF_CAP_SECONDS = 20.0
+
 
 class ScenemaAudioVAEEncode:
     """Encodes reference audio to latent for A2V voice conditioning.
 
     Takes a standard ComfyUI AUDIO input (e.g. from LoadAudio) and
-    encodes it via the Audio VAE encoder. The output latent can be
-    connected to the ScenemaAudioSampler's ref_latent input for
-    voice identity conditioning.
+    encodes it via the Audio VAE encoder. Audio longer than 20 seconds
+    is trimmed — additional length doesn't improve voice cloning and
+    wastes VRAM.
     """
 
     CATEGORY = "Scenema Audio"
@@ -41,16 +45,19 @@ class ScenemaAudioVAEEncode:
             },
             "optional": {
                 "max_seconds": ("FLOAT", {
-                    "default": 5.0,
+                    "default": MAX_REF_CAP_SECONDS,
                     "min": 1.0,
-                    "max": 30.0,
+                    "max": MAX_REF_CAP_SECONDS,
                     "step": 0.5,
+                    "tooltip": "How many seconds of the reference audio to encode. Hard-capped at 20s.",
                 }),
             },
         }
 
     @torch.inference_mode()
-    def encode(self, vae, audio, max_seconds=5.0):
+    def encode(self, vae, audio, max_seconds=MAX_REF_CAP_SECONDS):
+        # Enforce the cap even if a caller somehow passes a larger value.
+        max_seconds = min(max_seconds, MAX_REF_CAP_SECONDS)
         encoder = vae["encoder"]
         vae_sr = vae["sample_rate"]
 

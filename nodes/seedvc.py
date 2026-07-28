@@ -186,6 +186,9 @@ def convert_voice(source_audio, reference_audio, steps=DEFAULT_STEPS, cfg_rate=D
     finally:
         os.unlink(src_path)
         os.unlink(ref_path)
+        # SeedVC holds ~3.5GB on GPU. Unload so a subsequent run (which starts
+        # with Voice Design loading a 5.5GB transformer) doesn't OOM on 8GB cards.
+        _unload_seedvc()
 
     out_tensor = torch.from_numpy(samples).unsqueeze(0).unsqueeze(0)
     return {"waveform": out_tensor, "sample_rate": out_sr}

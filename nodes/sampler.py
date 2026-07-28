@@ -191,9 +191,10 @@ class ScenemaAudioSampler:
         if torch.isnan(audio_state_out.latent).any():
             logger.warning("NaN detected in denoised latent")
 
-        # Transformer stays on GPU. ComfyUI will evict via unload_all_models
-        # if another workflow needs the VRAM. Manually offloading here just
-        # forces a re-shuttle on the next sample call.
+        # Offload transformer so a downstream node (e.g. Gemma reload for a
+        # chained generation) has room on GPU. Skipping this on low-VRAM
+        # cards causes OOM when a subsequent node needs to allocate.
+        mdl_wrapper.to("cpu")
         torch.cuda.empty_cache()
 
         logger.info("Sampling complete")
