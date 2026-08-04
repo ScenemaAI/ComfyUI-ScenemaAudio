@@ -77,16 +77,23 @@ Also needs **~32 GB system RAM** for the pipeline components. Nothing is on-GPU 
 
 ## Writing prompts
 
-Two fields drive expressiveness:
+> **Note on XML:** raw `<speak>`/`<action>` XML input is no longer supported in the ComfyUI nodes. Everything is entered as plain fields — voice description, speech text, action tags. The XML the model expects is built for you internally. If you're coming from the original Scenema Audio API docs, use the field-based syntax below.
 
-**Voice description** — describes the speaker:
+Three fields drive expressiveness:
+
+**Voice description** — describes the speaker (age, gender presentation, timbre, accent, delivery):
 ```
 Male, mid 50s. Refined Central European accent with an Austrian tinge.
 Warm baritone that turns cold in an instant. Cultured, articulate,
 dangerously calm.
 ```
 
-**Speech text** — the words to say. Use inline `[bracketed cues]` for mid-speech performance direction. Each bracket becomes a stage direction the model performs at that exact position:
+**Action tags** — opening delivery cues, one per line. Sets the overall performance for the speech:
+```
+He smiles as he speaks, without warmth
+```
+
+**Speech text** — the words to say. Use inline `[bracketed cues]` for **mid-speech** performance direction. Each bracket becomes a stage direction the model performs at that exact position in the text:
 
 ```
 You know, [he lets out a soft, dry laugh] I've always found politeness
@@ -94,7 +101,11 @@ to be such a charming way of holding a knife. [His voice drops, suddenly
 intimate] And all the while, their hands are already reaching for you.
 ```
 
-Available cues: laughs, whispers, voice cracks, gasps, sobs, sighs, pauses, mood shifts, emphasis — anything you'd write as a stage direction in a script.
+Available bracket cues: laughs, whispers, voice cracks, gasps, sobs, sighs, pauses, mood shifts, emphasis, breath sounds — anything you'd write as a stage direction in a script. The model was trained on film-style narration and responds to natural language cues.
+
+**Where to put what:**
+- Opening tone / posture → `action_tags` field.
+- Mid-speech emotional shifts, laughs, whispers → inline `[brackets]` in `speech_text`.
 
 ## Preset dropdown
 
