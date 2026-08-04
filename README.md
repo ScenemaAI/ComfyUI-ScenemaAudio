@@ -53,15 +53,9 @@ If you skip this step the first generation fails with clear instructions. No cry
 
 ## Hardware requirements
 
-Minimum is 8 GB VRAM. Tested end to end on RTX 3070 (8 GB) and RTX 4090 (24 GB).
+Minimum is 8 GB VRAM. Tested end to end on RTX 3070 (8 GB) and RTX 4090 (24 GB). Generation runs up to 2x realtime.
 
-| GPU tier | Gemma path (auto) | Peak VRAM | Speed (33 s output) |
-|---|---|---|---|
-| **8 GB** (e.g. RTX 3070) | bf16 streams from CPU RAM | 6.7 GB | around 2 minutes, 3 to 4x realtime |
-| **12 GB and up** (e.g. RTX 3060 12 GB) | NF4 quantized on GPU | 15 GB | around 1 minute, 2x realtime |
-| **24 GB** (e.g. RTX 4090) | NF4 quantized on GPU | 21 GB | around 40 seconds first pass, around 15 seconds from warm cache. 1 to 2x realtime. |
-
-Also needs around 32 GB system RAM for the pipeline components. Nothing is on GPU when you are not generating.
+Also needs around 32 GB system RAM for the pipeline components.
 
 ## Nodes
 
