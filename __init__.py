@@ -18,15 +18,24 @@ _vendor_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vendor"
 if _vendor_path not in sys.path:
     sys.path.insert(0, _vendor_path)
 
-# Prepend the imageio-ffmpeg bundled binary to PATH so subprocess calls
-# to "ffmpeg" (from pydub, torchaudio, SeedVC) resolve without requiring
-# a system-wide ffmpeg install. imageio-ffmpeg is a pip-installable
-# Python package that ships an ffmpeg binary — declared in requirements.txt.
+# Point subprocess calls to "ffmpeg" at the imageio-ffmpeg bundled binary,
+# so users don't need a system-wide ffmpeg install. imageio-ffmpeg is a
+# pip-installable Python package that ships an ffmpeg binary — declared
+# in requirements.txt.
 try:
     import imageio_ffmpeg
-    _ffmpeg_dir = os.path.dirname(imageio_ffmpeg.get_ffmpeg_exe())
+    _ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+    _ffmpeg_dir = os.path.dirname(_ffmpeg_exe)
     if _ffmpeg_dir not in os.environ.get("PATH", "").split(os.pathsep):
         os.environ["PATH"] = _ffmpeg_dir + os.pathsep + os.environ.get("PATH", "")
+    # pydub caches AudioSegment.converter at import time via shutil.which("ffmpeg").
+    # Set it explicitly so it uses the bundled binary even if imported before us.
+    try:
+        from pydub import AudioSegment
+        AudioSegment.converter = _ffmpeg_exe
+        AudioSegment.ffprobe = imageio_ffmpeg.get_ffmpeg_exe()  # ffprobe not bundled; ffmpeg-only fallback
+    except ImportError:
+        pass
 except (ImportError, RuntimeError):
     pass
 
