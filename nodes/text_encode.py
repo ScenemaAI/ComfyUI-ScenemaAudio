@@ -20,7 +20,8 @@ import os
 
 import comfy.model_management
 import torch
-from huggingface_hub import snapshot_download
+from huggingface_hub import HfFolder, snapshot_download
+from huggingface_hub.utils import GatedRepoError, RepositoryNotFoundError
 from ltx_core.text_encoders.gemma.tokenizer import LTXVGemmaTokenizer
 from ltx_pipelines.distilled import DistilledPipeline
 from ltx_pipelines.utils.types import OffloadMode
@@ -51,11 +52,54 @@ _CACHED_TOKENIZER: LTXVGemmaTokenizer | None = None
 _ENCODE_MODE: str | None = None  # "nf4" | "bf16_gpu" | "streaming"
 
 
+_HF_TOKEN_MSG = (
+    "Gemma 3 12B is a gated model and requires a HuggingFace token.\n"
+    "\n"
+    "1. Visit https://huggingface.co/google/gemma-3-12b-it and click "
+    "'Agree and access repository'.\n"
+    "2. Create a token at https://huggingface.co/settings/tokens "
+    "(any scope with read access works).\n"
+    "3. Provide the token in one of these ways before launching ComfyUI:\n"
+    "     huggingface-cli login\n"
+    "   OR set the environment variable:\n"
+    "     export HF_TOKEN=hf_...\n"
+    "\n"
+    "Once done, restart ComfyUI and retry."
+)
+
+
+def _check_hf_token():
+    """Fail loudly if no HF token is available before we try to download Gemma."""
+    has_env = bool(os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN"))
+    has_cli = bool(HfFolder.get_token())
+    if not (has_env or has_cli):
+        raise RuntimeError(_HF_TOKEN_MSG)
+
+
 def _resolve_gemma_path(gemma_path):
-    """Resolve Gemma path to a local directory (auto-downloads if needed)."""
+    """Resolve Gemma path to a local directory (auto-downloads if needed).
+
+    Fails loudly with actionable instructions if the user hasn't set up
+    HuggingFace credentials — Gemma 3 12B is gated and can't be
+    downloaded anonymously.
+    """
     if os.path.isdir(gemma_path):
         return gemma_path
-    return snapshot_download(gemma_path)
+
+    _check_hf_token()
+    try:
+        return snapshot_download(gemma_path)
+    except GatedRepoError as e:
+        raise RuntimeError(
+            f"HuggingFace rejected the token for {gemma_path}. "
+            f"Make sure you've accepted the license at "
+            f"https://huggingface.co/{gemma_path}\n\nOriginal error: {e}"
+        ) from e
+    except RepositoryNotFoundError as e:
+        raise RuntimeError(
+            f"HuggingFace repo {gemma_path} not found or you lack access. "
+            f"Check the path and your token permissions.\n\nOriginal error: {e}"
+        ) from e
 
 
 def _select_encode_mode(vram_gb: float) -> str:
