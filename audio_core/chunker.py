@@ -18,6 +18,11 @@ import logging
 import random
 from dataclasses import dataclass
 
+try:
+    from kokoro import KPipeline
+except ImportError:
+    KPipeline = None
+
 from .compiler import compile_chunk_prompt, compile_prompt, extract_sentence_actions
 from .validator import validate_prompt
 
@@ -49,9 +54,11 @@ def _get_kokoro():
     if _kokoro_pipeline is not None:
         return _kokoro_pipeline
 
-    try:
-        from kokoro import KPipeline
+    if KPipeline is None:
+        _kokoro_available = False
+        return None
 
+    try:
         pipe = KPipeline(lang_code="a", device="cuda")
         # Verify it's a real Kokoro pipeline (not a mock in tests)
         if not hasattr(pipe, "__module__") or "kokoro" not in str(
@@ -316,7 +323,7 @@ def plan_chunks(
             ChunkSpec(
                 compiled_prompt=chunk_prompt,
                 duration_s=chunk_dur,
-                seed=base_seed + i * 1000,
+                seed=base_seed,
                 expected_text=chunk_text,
                 language=compiled.language,
             )

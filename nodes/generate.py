@@ -30,8 +30,10 @@ from .sampler import (
     _build_pixel_shape, _build_video_state, _build_audio_state,
     _apply_a2v_reference, _strip_reference_frames,
 )
+from .presets import CUSTOM, PRESETS, PRESET_NAMES
 from .text_encode import _encode_via_pipeline, _resolve_gemma_path, DEFAULT_GEMMA
 from .utils import FPS, download_model, PIPELINE_CKPT
+from .vocal_separator import _run_separator
 
 _pkg_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _pkg_root not in sys.path:
@@ -39,6 +41,8 @@ if _pkg_root not in sys.path:
 
 from audio_core.chunker import plan_chunks, estimate_duration, ChunkSpec
 from audio_core.compiler import compile_prompt
+from audio_core.audio_utils import trim_silence, normalize_volume, shorten_long_silence
+from audio_core.whisper_aligner import validate_text
 
 from .seedvc import convert_voice
 
@@ -229,6 +233,10 @@ class ScenemaAudioGenerate:
             "required": {
                 "model": ("SA_MODEL",),
                 "vae": ("SA_VAE",),
+                "preset": (PRESET_NAMES, {
+                    "default": CUSTOM,
+                    "tooltip": "Pick a preset to auto-fill voice, gender, scene, action tags, and speech text. Choose Custom to write your own.",
+                }),
                 "voice_description": ("STRING", {
                     "multiline": True,
                     "default": "Male, late 60s. Deep, gravelly. Slow and deliberate. The weight of the cosmos in every word.",
@@ -288,17 +296,29 @@ class ScenemaAudioGenerate:
         }
 
     @torch.inference_mode()
-    def generate(self, model, vae, voice_description, gender, speech_text, scene, seed,
+    def generate(self, model, vae, preset, voice_description, gender, speech_text, scene, seed,
                  custom_scene="", action_tags="", language="English", pace=1.5,
                  strip_background_sfx="auto",
                  gemma_path="auto", ref_latent=None,
                  validate=False, min_match_ratio=0.9,
                  skip_vc=False, vc_steps=25, vc_cfg_rate=0.5):
 
+        # Preset override — populated by the JS hook client-side, but also
+        # applied here as a safety net in case widgets weren't synced.
+        if preset != CUSTOM and preset in PRESETS:
+            p = PRESETS[preset]
+            voice_description = p["voice_description"]
+            gender = p["gender"]
+            speech_text = p["speech_text"]
+            scene = p["scene"]
+            action_tags = p["action_tags"]
+            custom_scene = p.get("custom_scene", "")
+            logger.info("Preset applied: %s", preset)
+
         if scene == SCENE_SENTINEL:
             raise ValueError(
-                "scene: required field. Pick one of the acoustic presets, "
-                "or provide a custom_scene string for a freeform description."
+                "scene: required field. Pick a preset, one of the acoustic "
+                "options, or provide a custom_scene string."
             )
 
         xml_prompt = _build_xml(voice_description, gender, speech_text,
@@ -368,7 +388,28 @@ class ScenemaAudioGenerate:
         torch.cuda.empty_cache()
         _log_vram("after all chunks")
 
-        combined = torch.cat([w.squeeze(0) for w in waveforms], dim=-1).unsqueeze(0)
+        # Per-chunk trim + normalize before concatenation (matches production).
+        # Prevents perceived voice drift from loudness jumps between chunks
+        # and cleans up leading/trailing silence that LTX often adds.
+        processed_np = []
+        for w in waveforms:
+            # w shape: (1, C, samples)
+            w_np = w.squeeze(0).numpy()  # (C, samples)
+            w_np = w_np.T if w_np.ndim == 2 else w_np  # (samples, C)
+            w_np = trim_silence(w_np, sr, max_silence=0.5)
+            w_np = normalize_volume(w_np, sr)
+            processed_np.append(w_np)
+        combined_np = np.concatenate(processed_np, axis=0)
+        # Cap internal silences too
+        combined_np = shorten_long_silence(combined_np, sr, max_duration=min(0.5 * pace, 1.5))
+
+        # Back to (1, C, samples) tensor for ComfyUI
+        if combined_np.ndim == 2:
+            combined_np = combined_np.T  # (C, samples)
+        combined = torch.from_numpy(combined_np).float()
+        if combined.ndim == 1:
+            combined = combined.unsqueeze(0)
+        combined = combined.unsqueeze(0)  # (1, C, samples)
         combined_audio = {"waveform": combined, "sample_rate": sr}
 
         should_strip = self._should_strip_background(scene, strip_background_sfx)
@@ -413,7 +454,6 @@ class ScenemaAudioGenerate:
 
     def _strip_background(self, audio):
         """Run MelBandRoFormer to isolate speech from any ambient bleed."""
-        from .vocal_separator import _run_separator
         logger.info("Stripping background SFX (scene = studio-clean intent)...")
         vocals_t, _, sr = _run_separator(audio)
         return {"waveform": vocals_t, "sample_rate": sr}
@@ -421,8 +461,6 @@ class ScenemaAudioGenerate:
     def _diffuse_with_validation(self, mdl_wrapper, device, vae, vc, ac, chunk,
                                   ref_gpu, min_match_ratio):
         """Diffuse a chunk with Whisper validation and retry on word-match failure."""
-        from audio_core.whisper_aligner import validate_text
-
         duration = chunk.duration_s
         seed = chunk.seed
         best_waveform = None

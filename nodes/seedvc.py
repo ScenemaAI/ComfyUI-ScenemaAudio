@@ -64,7 +64,11 @@ def _load_seedvc():
         os.path.join(_VENDOR_PATH, "checkpoints", "hf_cache"),
     )
 
-    # Patch BigVGAN for huggingface_hub compat
+    # NOTE: these imports MUST stay inside _load_seedvc, after
+    # _ensure_seedvc_on_path() (adds vendor/seedvc to sys.path) and
+    # os.chdir(_VENDOR_PATH) above. The vendored SeedVC modules load
+    # config files relative to cwd at import time — moving these to the
+    # top of the file breaks path resolution.
     import modules.bigvgan.bigvgan as bigvgan_mod
     orig_from_pretrained = bigvgan_mod.BigVGAN._from_pretrained
 

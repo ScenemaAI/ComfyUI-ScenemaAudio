@@ -38,6 +38,7 @@
       "flags": {},
       "order": 2,
       "mode": 0,
+      "title": "Voice Reference Audio (optional, for cloning)",
       "inputs": [],
       "outputs": [{"name": "AUDIO", "type": "AUDIO", "links": null}],
       "properties": {"Node name for S&R": "LoadAudio"},
@@ -51,6 +52,7 @@
       "flags": {},
       "order": 3,
       "mode": 0,
+      "title": "Encode Reference (feeds ref_latent → Generate)",
       "inputs": [
         {"name": "vae", "type": "SA_VAE", "link": 5},
         {"name": "audio", "type": "AUDIO", "link": null}
@@ -75,6 +77,7 @@
       "outputs": [{"name": "audio", "type": "AUDIO", "links": [9]}],
       "properties": {"Node name for S&R": "ScenemaAudioGenerate"},
       "widgets_values": [
+        "Pale Blue Dot (grief)",
         "Male, late 60s. Warm baritone weighted with grief. Slow, deliberate. Barely holding composure — the words matter too much to rush.",
         "male",
         "[He speaks softly, almost a whisper] Look again at that dot. [He pauses, voice thickening] That's here. That's home. That's us. [He steadies himself, drawing a slow breath] On it, everyone you love, everyone you know, everyone you ever heard of, every human being who ever was, lived out their lives. [His voice cracks quietly] Every saint and sinner in the history of our species — [he laughs softly, without joy] lived there, on a mote of dust suspended in a sunbeam.",
@@ -114,23 +117,7 @@
     [5, 2, 0, 4, 0, "SA_VAE"],
     [9, 5, 0, 6, 0, "AUDIO"]
   ],
-  "groups": [
-    {
-      "title": "1. Load models",
-      "bounding": [60, 60, 340, 190],
-      "color": "#88a"
-    },
-    {
-      "title": "2. Voice cloning (optional — upload audio + connect ref_latent to Generate)",
-      "bounding": [60, 270, 780, 200],
-      "color": "#7a6"
-    },
-    {
-      "title": "3. Generate",
-      "bounding": [860, 60, 810, 700],
-      "color": "#3f789e"
-    }
-  ],
+  "groups": [],
   "config": {},
   "extra": {"ds": {"scale": 0.7, "offset": [0, 0]}},
   "version": 0.4

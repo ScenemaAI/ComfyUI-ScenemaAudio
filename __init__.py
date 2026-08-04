@@ -58,7 +58,10 @@ try:
         "ScenemaAudioGenerate": "Scenema Audio Generate",
     }
 
-    __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
+    # JS extensions live in web/ — powers the preset dropdown's auto-fill.
+    WEB_DIRECTORY = "./web"
+
+    __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]
 
 except ImportError:
     # Running outside ComfyUI (e.g. pytest)
