@@ -9,6 +9,7 @@ LTX 2.3 audio-only diffusion.
 """
 
 import os
+import shutil
 import sys
 
 # Add vendored packages to sys.path before any node imports.
@@ -67,6 +68,32 @@ try:
 
     # JS extensions live in web/. Powers the preset dropdown's auto-fill.
     WEB_DIRECTORY = "./web"
+
+    # Copy shipped workflow files into ComfyUI's user workflows directory so
+    # they appear in the Workflows sidebar without the user having to drag
+    # JSON files onto the canvas. Only copies files that don't already exist,
+    # so user edits are preserved across restarts.
+    def _install_workflows():
+        try:
+            import folder_paths
+            pkg_dir = os.path.dirname(os.path.abspath(__file__))
+            src_dir = os.path.join(pkg_dir, "workflows")
+            if not os.path.isdir(src_dir):
+                return
+            user_dir = getattr(folder_paths, "user_directory", None) \
+                or folder_paths.get_user_directory()
+            dest_dir = os.path.join(user_dir, "default", "workflows", "Scenema Audio")
+            os.makedirs(dest_dir, exist_ok=True)
+            for fn in os.listdir(src_dir):
+                if not fn.endswith(".json"):
+                    continue
+                dest = os.path.join(dest_dir, fn)
+                if not os.path.exists(dest):
+                    shutil.copy2(os.path.join(src_dir, fn), dest)
+        except Exception:
+            pass
+
+    _install_workflows()
 
     __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]
 
