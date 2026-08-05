@@ -7,80 +7,186 @@
     {
       "id": 1,
       "type": "ScenemaAudioModelLoader",
-      "pos": [80, 100],
-      "size": [300, 58],
+      "pos": [
+        80,
+        100
+      ],
+      "size": [
+        300,
+        58
+      ],
       "flags": {},
       "order": 0,
       "mode": 0,
       "inputs": [],
-      "outputs": [{"name": "model", "type": "SA_MODEL", "links": [1]}],
-      "properties": {"Node name for S&R": "ScenemaAudioModelLoader"},
-      "widgets_values": ["int8"]
+      "outputs": [
+        {
+          "name": "model",
+          "type": "SA_MODEL",
+          "links": [
+            1
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ScenemaAudioModelLoader"
+      },
+      "widgets_values": [
+        "int8"
+      ]
     },
     {
       "id": 2,
       "type": "ScenemaAudioVAELoader",
-      "pos": [80, 200],
-      "size": [300, 26],
+      "pos": [
+        80,
+        200
+      ],
+      "size": [
+        300,
+        26
+      ],
       "flags": {},
       "order": 1,
       "mode": 0,
       "inputs": [],
-      "outputs": [{"name": "vae", "type": "SA_VAE", "links": [2, 5]}],
-      "properties": {"Node name for S&R": "ScenemaAudioVAELoader"},
+      "outputs": [
+        {
+          "name": "vae",
+          "type": "SA_VAE",
+          "links": [
+            2,
+            5
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ScenemaAudioVAELoader"
+      },
       "widgets_values": []
     },
     {
       "id": 3,
       "type": "LoadAudio",
-      "pos": [80, 320],
-      "size": [400, 140],
+      "pos": [
+        80,
+        320
+      ],
+      "size": [
+        400,
+        140
+      ],
       "flags": {},
       "order": 2,
       "mode": 0,
       "title": "Voice Reference Audio (optional, for cloning)",
       "inputs": [],
-      "outputs": [{"name": "AUDIO", "type": "AUDIO", "links": null}],
-      "properties": {"Node name for S&R": "LoadAudio"},
-      "widgets_values": ["", null, null]
+      "outputs": [
+        {
+          "name": "AUDIO",
+          "type": "AUDIO",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadAudio"
+      },
+      "widgets_values": [
+        "",
+        null,
+        null
+      ]
     },
     {
       "id": 4,
       "type": "ScenemaAudioVAEEncode",
-      "pos": [540, 320],
-      "size": [270, 78],
+      "pos": [
+        540,
+        320
+      ],
+      "size": [
+        270,
+        78
+      ],
       "flags": {},
       "order": 3,
       "mode": 0,
-      "title": "Encode Reference (feeds ref_latent → Generate)",
+      "title": "Encode Reference (feeds ref_latent \u2192 Generate)",
       "inputs": [
-        {"name": "vae", "type": "SA_VAE", "link": 5},
-        {"name": "audio", "type": "AUDIO", "link": null}
+        {
+          "name": "vae",
+          "type": "SA_VAE",
+          "link": 5
+        },
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": null
+        }
       ],
-      "outputs": [{"name": "ref_latent", "type": "SA_LATENT", "links": null}],
-      "properties": {"Node name for S&R": "ScenemaAudioVAEEncode"},
-      "widgets_values": [10.0]
+      "outputs": [
+        {
+          "name": "ref_latent",
+          "type": "SA_LATENT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ScenemaAudioVAEEncode"
+      },
+      "widgets_values": [
+        10.0
+      ]
     },
     {
       "id": 5,
       "type": "ScenemaAudioGenerate",
-      "pos": [880, 100],
-      "size": [420, 620],
+      "pos": [
+        880,
+        100
+      ],
+      "size": [
+        420,
+        620
+      ],
       "flags": {},
       "order": 4,
       "mode": 0,
       "inputs": [
-        {"name": "model", "type": "SA_MODEL", "link": 1},
-        {"name": "vae", "type": "SA_VAE", "link": 2},
-        {"name": "ref_latent", "type": "SA_LATENT", "link": null, "shape": 7}
+        {
+          "name": "model",
+          "type": "SA_MODEL",
+          "link": 1
+        },
+        {
+          "name": "vae",
+          "type": "SA_VAE",
+          "link": 2
+        },
+        {
+          "name": "ref_latent",
+          "type": "SA_LATENT",
+          "link": null,
+          "shape": 7
+        }
       ],
-      "outputs": [{"name": "audio", "type": "AUDIO", "links": [9]}],
-      "properties": {"Node name for S&R": "ScenemaAudioGenerate"},
+      "outputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "links": [
+            9
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ScenemaAudioGenerate"
+      },
       "widgets_values": [
-        "Pale Blue Dot (grief)",
-        "Male, late 60s. Warm baritone weighted with grief. Slow, deliberate. Barely holding composure — the words matter too much to rush.",
+        "Custom",
+        "Male, late 60s. Warm baritone weighted with grief. Slow, deliberate. Barely holding composure \u2014 the words matter too much to rush.",
         "male",
-        "[He speaks softly, almost a whisper] Look again at that dot. [He pauses, voice thickening] That's here. That's home. That's us. [He steadies himself, drawing a slow breath] On it, everyone you love, everyone you know, everyone you ever heard of, every human being who ever was, lived out their lives. [His voice cracks quietly] Every saint and sinner in the history of our species — [he laughs softly, without joy] lived there, on a mote of dust suspended in a sunbeam.",
+        "[He speaks softly, almost a whisper] Look again at that dot. [He pauses, voice thickening] That's here. That's home. That's us. [He steadies himself, drawing a slow breath] On it, everyone you love, everyone you know, everyone you ever heard of, every human being who ever was, lived out their lives. [His voice cracks quietly] Every saint and sinner in the history of our species \u2014 [he laughs softly, without joy] lived there, on a mote of dust suspended in a sunbeam.",
         "Absolute silence",
         582641097,
         "fixed",
@@ -100,25 +206,75 @@
     {
       "id": 6,
       "type": "PreviewAudio",
-      "pos": [1360, 100],
-      "size": [270, 88],
+      "pos": [
+        1360,
+        100
+      ],
+      "size": [
+        270,
+        88
+      ],
       "flags": {},
       "order": 5,
       "mode": 0,
-      "inputs": [{"name": "audio", "type": "AUDIO", "link": 9}],
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 9
+        }
+      ],
       "outputs": [],
-      "properties": {"Node name for S&R": "PreviewAudio"},
+      "properties": {
+        "Node name for S&R": "PreviewAudio"
+      },
       "widgets_values": []
     }
   ],
   "links": [
-    [1, 1, 0, 5, 0, "SA_MODEL"],
-    [2, 2, 0, 5, 1, "SA_VAE"],
-    [5, 2, 0, 4, 0, "SA_VAE"],
-    [9, 5, 0, 6, 0, "AUDIO"]
+    [
+      1,
+      1,
+      0,
+      5,
+      0,
+      "SA_MODEL"
+    ],
+    [
+      2,
+      2,
+      0,
+      5,
+      1,
+      "SA_VAE"
+    ],
+    [
+      5,
+      2,
+      0,
+      4,
+      0,
+      "SA_VAE"
+    ],
+    [
+      9,
+      5,
+      0,
+      6,
+      0,
+      "AUDIO"
+    ]
   ],
   "groups": [],
   "config": {},
-  "extra": {"ds": {"scale": 0.7, "offset": [0, 0]}},
+  "extra": {
+    "ds": {
+      "scale": 0.7,
+      "offset": [
+        0,
+        0
+      ]
+    }
+  },
   "version": 0.4
 }
