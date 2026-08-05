@@ -8,6 +8,7 @@ Expressive text-to-speech with zero-shot voice cloning via
 LTX 2.3 audio-only diffusion.
 """
 
+import hashlib
 import os
 import shutil
 import sys
@@ -71,8 +72,11 @@ try:
 
     # Copy shipped workflow files into ComfyUI's user workflows directory so
     # they appear in the Workflows sidebar without the user having to drag
-    # JSON files onto the canvas. Only copies files that don't already exist,
-    # so user edits are preserved across restarts.
+    # JSON files onto the canvas. Overwrites when the shipped file's content
+    # hash differs from the destination — this way package updates always
+    # ship the latest workflow, but restarts with no shipped changes leave
+    # the destination alone. Users who want to preserve customizations
+    # should Save As under a different name.
     def _install_workflows():
         try:
             import folder_paths
@@ -87,9 +91,14 @@ try:
             for fn in os.listdir(src_dir):
                 if not fn.endswith(".json"):
                     continue
+                src = os.path.join(src_dir, fn)
                 dest = os.path.join(dest_dir, fn)
-                if not os.path.exists(dest):
-                    shutil.copy2(os.path.join(src_dir, fn), dest)
+                src_hash = hashlib.sha256(open(src, "rb").read()).hexdigest()
+                if os.path.exists(dest):
+                    dest_hash = hashlib.sha256(open(dest, "rb").read()).hexdigest()
+                    if src_hash == dest_hash:
+                        continue
+                shutil.copy2(src, dest)
         except Exception:
             pass
 

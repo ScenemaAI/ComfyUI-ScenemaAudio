@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "comfyui-scenema-audio"
-version = "0.1.2"
+version = "0.1.3"
 description = "Expressive text-to-speech with zero-shot voice cloning. Ships with preset voices covering accents, ages, and emotions. Runs on 8GB VRAM."
 license = { text = "MIT License" }
 requires-python = ">=3.10"

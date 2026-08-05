@@ -288,7 +288,7 @@ class ScenemaAudioGenerate:
                 "min_match_ratio": ("FLOAT", {"default": 0.9, "min": 0.0, "max": 1.0, "step": 0.05}),
                 "skip_vc": ("BOOLEAN", {
                     "default": False,
-                    "tooltip": "Skip SeedVC voice-consistency polish across chunks. Faster, slightly less consistent voice.",
+                    "tooltip": "Skip the cross-chunk voice consistency polish. Faster, but voice may drift subtly between chunks on longer generations.",
                 }),
                 "vc_steps": ("INT", {"default": 25, "min": 5, "max": 50, "step": 5}),
                 "vc_cfg_rate": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 1.0, "step": 0.1}),
@@ -414,19 +414,18 @@ class ScenemaAudioGenerate:
 
         should_strip = self._should_strip_background(scene, strip_background_sfx)
 
-        # SeedVC only runs when a reference audio was provided. For
-        # description-only generation, A2V tail-chaining + the voice
-        # description keep chunks consistent, and skipping SeedVC preserves
-        # laughs, whispers, and other expressive vocals that its speech
-        # re-synthesis would otherwise flatten.
-        needs_vc = ref_latent is not None
+        # Multi-chunk generation drifts subtly between chunks even with the
+        # same voice description, so we polish every chunk against the first
+        # one to lock the voice identity across the whole clip. Single-chunk
+        # generations have nothing to align to, so we skip.
+        needs_vc = len(chunks) > 1
         if not skip_vc and needs_vc:
             combined_audio = self._apply_vc(
                 combined_audio, waveforms, sr, ref_latent, vae,
                 vc_steps, vc_cfg_rate,
             )
-        elif ref_latent is None:
-            logger.info("No reference audio — skipping SeedVC (voice description handles consistency)")
+        elif not needs_vc:
+            logger.info("Single chunk — skipping cross-chunk voice polish")
 
         if should_strip:
             combined_audio = self._strip_background(combined_audio)
